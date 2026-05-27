@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>전례단 시간표 제작기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@400;700&display=swap');
+
+  :root {
+    --navy: #1a2744; --gold: #c8a84b; --red: #c0392b;
+    --green: #1a7a4a; --light: #f5f3ee; --white: #ffffff;
+    --gray: #8a8a8a; --border: #d4c9a8; --cell-bg: #fdfcf8;
+    --sunday: #fff0f0; --saturday: #f0f4ff;
+    --shadow: 0 4px 24px rgba(26,39,68,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #eeeae0; min-height: 100vh; color: var(--navy); }
+
+  header {
+    background: var(--navy); color: var(--white);
+    padding: 16px 28px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 3px solid var(--gold);
+  }
+  header .cross { font-size: 26px; color: var(--gold); }
+  header h1 { font-family: 'Noto Serif KR', serif; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+  header p  { font-size: 11px; color: #aab3cc; margin-top: 2px; }
+
+  .container { display: flex; min-height: calc(100vh - 72px); }
+
+  aside {
+    width: 290px; min-width: 250px; background: var(--white);
+    border-right: 1px solid var(--border); padding: 20px 16px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    color: var(--gray); text-transform: uppercase; margin-bottom: 8px;
+    padding-bottom: 5px; border-bottom: 1px solid var(--border);
+  }
+  label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 3px; color: var(--navy); }
+  input[type="number"], input[type="text"], select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; font-family: inherit;
+    background: var(--cell-bg); color: var(--navy); outline: none; transition: border 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--gold); }
+
+  .btn {
+    display: block; width: 100%; padding: 10px;
+    border: none; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    transition: all 0.2s; letter-spacing: 1px;
+  }
+  .btn-primary { background: var(--navy); color: var(--white); }
+  .btn-primary:hover { background: #273562; }
+  .btn-gold { background: var(--gold); color: var(--white); margin-top: 4px; }
+  .btn-gold:hover { background: #b8962e; }
+  .btn-outline {
+    background: transparent; color: var(--navy);
+    border: 1.5px solid var(--border); margin-top: 4px;
+  }
+  .btn-outline:hover { border-color: var(--navy); background: #f5f3ee; }
+
+  .member-list { display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto; }
+  .member-tag {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--light); border-radius: 6px; padding: 6px 10px; font-size: 13px;
+    cursor: pointer; transition: background 0.15s; border: 1.5px solid transparent;
+  }
+  .member-tag:hover { background: #ede8d8; border-color: var(--gold); }
+  .member-tag .tag-right { display: flex; align-items: center; gap: 6px; }
+  .avail-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+  .badge-ok   { background: #d4f0e2; color: var(--green); }
+  .badge-off  { background: #fde8e8; color: var(--red); }
+  .badge-mix  { background: #fff3cd; color: #856404; }
+  .badge-none { background: #eee; color: #999; }
+  .del-btn { background: none; border: none; cursor: pointer; color: var(--gray); font-size: 15px; line-height: 1; padding: 0 2px; }
+  .del-btn:hover { color: var(--red); }
+  .member-add { display: flex; gap: 6px; }
+  .member-add input { flex: 1; }
+  .member-add button {
+    padding: 7px 11px; background: var(--navy); color: white;
+    border: none; border-radius: 6px; cursor: pointer; font-size: 17px; line-height: 1;
+  }
+  .member-add button:hover { background: #273562; }
+
+  .slot-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .slot-row input { flex: 1; }
+  .slot-row button { background: none; border: none; cursor: pointer; color: var(--gray); font-size: 15px; }
+  .slot-row button:hover { color: var(--red); }
+
+  main { flex: 1; padding: 20px; overflow-x: auto; }
+
+  .schedule-wrapper {
+    background: var(--white); border-radius: 12px;
+    box-shadow: var(--shadow); overflow: hidden; min-width: 760px;
+  }
+  .table-header-bar {
+    background: var(--navy); padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .table-title { font-family: 'Noto Serif KR', serif; color: var(--white); font-size: 17px; font-weight: 700; letter-spacing: 3px; }
+  .table-title span { color: var(--gold); }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead th {
+    background: var(--navy); color: var(--white);
+    padding: 9px 4px; font-size: 13px; font-weight: 700;
+    text-align: center; border: 1px solid rgba(255,255,255,0.1);
+  }
+  thead th.sun { color: #ff8a8a; }
+  thead th.sat { color: #9ab4ff; }
+
+  td.date-cell {
+    vertical-align: top; padding: 6px 4px; text-align: center;
+    border: 1px solid var(--border); background: var(--cell-bg);
+    min-height: 100px; cursor: pointer; transition: background 0.15s; position: relative;
+  }
+  td.date-cell:hover { background: #f0ece0; }
+  td.date-cell.sunday  { background: var(--sunday); }
+  td.date-cell.saturday{ background: var(--saturday); }
+  td.date-cell.empty   { background: #ebebeb; cursor: default; }
+  td.date-cell.today   { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+  .date-num { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; display: block; }
+  .date-num.sun { color: var(--red); }
+  .date-num.sat { color: #3a5bd9; }
+  .date-num.holiday { color: var(--red) !important; }
+
+  .cell-slots { display: flex; flex-direction: column; gap: 2px; }
+  .slot-block {
+    background: var(--navy); color: var(--white);
+    border-radius: 4px; padding: 3px 4px; font-size: 9px; line-height: 1.5; text-align: left;
+  }
+  .slot-block .slot-time { font-weight: 700; color: var(--gold); }
+
+  /* MODALS */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,39,68,0.55); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white); border-radius: 12px;
+    padding: 24px; width: 480px; max-width: 96vw; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: popIn 0.18s ease;
+  }
+  .modal.wide { width: 560px; }
+  @keyframes popIn { from{transform:scale(0.93);opacity:0} to{transform:scale(1);opacity:1} }
+  .modal h2 {
+    font-family: 'Noto Serif KR', serif; font-size: 17px;
+    margin-bottom: 16px; color: var(--navy);
+    border-bottom: 2px solid var(--gold); padding-bottom: 9px;
+  }
+  .modal .field { margin-bottom: 12px; }
+  .modal .field label { font-size: 11px; font-weight: 700; color: var(--gray); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-btns button { flex: 1; }
+  .modal-slot-list { display: flex; flex-direction: column; gap: 7px; max-height: 300px; overflow-y: auto; }
+  .modal-slot-item {
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+  }
+  .modal-slot-item .slot-header { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; }
+  .modal-slot-item .slot-label  { font-weight:700; font-size:12px; color:var(--gold); }
+  .modal-slot-item .rm-btn { background:none; border:none; cursor:pointer; color:var(--gray); font-size:15px; }
+  .add-slot-btn {
+    background: none; border: 1.5px dashed var(--border);
+    border-radius: 8px; padding: 9px; width: 100%;
+    cursor: pointer; font-size: 12px; color: var(--gray); font-family: inherit; transition: all 0.2s;
+  }
+  .add-slot-btn:hover { border-color: var(--navy); color: var(--navy); }
+
+  /* AVAILABILITY MODAL */
+  .avail-name  { font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--navy); }
+  .avail-tabs  { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .avail-tab   { flex:1; padding:9px 4px; text-align:center; cursor:pointer; font-size:12px; font-weight:700; background:var(--light); border:none; font-family:inherit; transition:all 0.15s; }
+  .avail-tab.act-ok    { background:var(--green); color:#fff; }
+  .avail-tab.act-off   { background:var(--red);   color:#fff; }
+  .avail-tab.act-clear { background:#888;         color:#fff; }
+  .avail-tab:not(.act-ok):not(.act-off):not(.act-clear):hover { background:#ede8d8; }
+
+  .avail-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .avail-head { text-align:center; font-size:11px; font-weight:700; padding:3px 0; color:var(--gray); }
+  .avail-head.sun { color:var(--red); }
+  .avail-head.sat { color:#3a5bd9; }
+  .avail-day  {
+    text-align:center; padding:7px 2px; border-radius:6px;
+    font-size:12px; font-weight:600; cursor:pointer;
+    border:1.5px solid var(--border); background:var(--cell-bg);
+    transition:all 0.12s; user-select:none;
+  }
+  .avail-day.blank { border-color:transparent; background:transparent; cursor:default; pointer-events:none; }
+  .avail-day.d-ok  { background:#d4f0e2; border-color:var(--green); color:var(--green); }
+  .avail-day.d-off { background:#fde8e8; border-color:var(--red);   color:var(--red); }
+  .avail-day:not(.blank):hover { opacity:0.7; }
+
+  /* ── 시간대별 불가 설정 ── */
+  .timeoff-section { margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
+  .timeoff-row { display:flex; align-items:center; gap:7px; margin-bottom:8px; flex-wrap:wrap; }
+  .timeoff-daylabel { font-size:12px; font-weight:700; min-width:20px; text-align:center; }
+  .timeoff-btn {
+    padding:4px 11px; border-radius:20px; font-size:11px; font-weight:700;
+    border:1.5px solid var(--border); background:var(--cell-bg); color:var(--navy);
+    cursor:pointer; font-family:inherit; transition:all 0.15s; line-height:1.6;
+  }
+  .timeoff-btn:hover { border-color:var(--red); color:var(--red); background:#fff5f5; }
+  .timeoff-btn.is-off { background:#fde8e8; border-color:var(--red); color:var(--red); }
+  .timeoff-summary { font-size:11px; color:var(--gray); margin-top:4px; line-height:1.7; }
+
+  /* ── 시간대별 불가 설정 ── */
+  .timeoff-section { margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
+  .timeoff-row { display:flex; align-items:center; gap:7px; margin-bottom:8px; flex-wrap:wrap; }
+  .timeoff-daylabel {
+    font-size:12px; font-weight:700; min-width:20px; text-align:center;
+  }
+  .timeoff-btn {
+    padding:4px 11px; border-radius:20px; font-size:11px; font-weight:700;
+    border:1.5px solid var(--border); background:var(--cell-bg); color:var(--navy);
+    cursor:pointer; font-family:inherit; transition:all 0.15s; line-height:1.6;
+  }
+  .timeoff-btn:hover { border-color:var(--red); color:var(--red); background:#fff5f5; }
+  .timeoff-btn.is-off { background:#fde8e8; border-color:var(--red); color:var(--red); }
+  .timeon-btn {
+    padding:4px 11px; border-radius:20px; font-size:11px; font-weight:700;
+    border:1.5px solid var(--border); background:var(--cell-bg); color:var(--navy);
+    cursor:pointer; font-family:inherit; transition:all 0.15s; line-height:1.6;
+  }
+  .timeon-btn:hover { border-color:var(--green); color:var(--green); background:#f0faf5; }
+  .timeon-btn.is-on { background:#d4f0e2; border-color:var(--green); color:var(--green); }
+  .timeoff-summary { font-size:11px; color:var(--gray); margin-top:4px; line-height:1.7; }
+
+  .legend { display:flex; gap:14px; margin-top:10px; font-size:12px; align-items:center; flex-wrap:wrap; }
+  .ldot { width:12px; height:12px; border-radius:3px; display:inline-block; margin-right:3px; vertical-align:middle; }
+  .tip-box { margin-top:12px; padding:10px; background:var(--light); border-radius:8px; font-size:12px; color:var(--gray); line-height:1.7; }
+
+  /* ── 매일미사 전례력 패널 ── */
+  .missa-panel {
+    background: linear-gradient(135deg, #1a2744 0%, #2a3d6e 100%);
+    border-radius: 10px; padding: 14px; color: white;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .missa-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+  .missa-logo { font-size: 22px; color: var(--gold); line-height: 1; }
+  .missa-title { font-size: 12px; font-weight: 700; color: white; letter-spacing: 0.5px; }
+  .missa-sub { font-size: 10px; color: #aab3cc; margin-top: 1px; }
+  .missa-month { font-size: 13px; font-weight: 700; color: var(--gold); text-align: center; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .missa-btn {
+    display: block; text-align: center; padding: 9px 8px;
+    background: var(--gold); color: #1a2744; border-radius: 7px;
+    font-size: 12px; font-weight: 700; text-decoration: none;
+    transition: background 0.2s; letter-spacing: 0.3px;
+  }
+  .missa-btn:hover { background: #b8962e; color: white; }
+  .missa-btn-outline {
+    background: transparent; color: #aab3cc;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .missa-btn-outline:hover { background: rgba(255,255,255,0.08); color: white; }
+
+  .church-footer {
+    background: var(--navy); color: #aab3cc;
+    text-align: center; padding: 18px 20px; font-size: 11px; line-height: 2;
+    border-top: 3px solid var(--gold);
+  }
+  .church-footer a { color: var(--gold); text-decoration: none; }
+  .church-footer a:hover { text-decoration: underline; }
+  /* print */
+  @media print {
+    body { background:white; }
+    header, aside { display:none; }
+    .container { display:block; }
+    main { padding:0; }
+    .schedule-wrapper { box-shadow:none; border-radius:0; }
+    .table-header-bar { background:white; }
+    .table-title { color:black; }
+    .table-title span { color:var(--red); }
+    thead th { background:white; color:black; border:1px solid #aaa; }
+    .slot-block { background:white!important; color:black!important; border:1px solid #aaa; }
+    .slot-block .slot-time { color:var(--red)!important; }
+    .church-footer { display:none; }
+    .feast-day { display:none; }
+    .holiday-tag { display:none; }
+  }
+  .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
+  .feast-day { font-size:8px; color:var(--red); font-weight:700; line-height:1.4; margin:1px 0 2px; word-break:keep-all; text-align:left; padding:0 2px; }
+  .holiday-tag { font-size:8px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:1px 0 2px; display:inline-block; word-break:keep-all; }
+  .special-label { font-size:16px; font-weight:700; border-radius:3px; padding:1px 5px; margin:1px 1px 1px 0; display:inline-block; word-break:keep-all; background:#e8eeff; color:#2240c4; }
+
+  /* ── 역할 배지 ── */
+  .role-badge { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:700; white-space:nowrap; }
+  .role-haesul { background:#dbeafe; color:#1e40af; }
+  .role-dok     { background:#d4f0e2; color:var(--green); }
+  .role-both    { background:#fef3c7; color:#92400e; }
+  .role-none    { background:#eee; color:#999; }
+
+  /* ── 역할 선택 (모달 내) ── */
+  .role-tabs { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:14px; }
+  .role-tab  { flex:1; padding:8px 4px; text-align:center; cursor:pointer; font-size:12px; font-weight:700;
+               background:var(--light); border:none; font-family:inherit; transition:all 0.15s; }
+  .role-tab.act-haesul { background:#1e40af; color:#fff; }
+  .role-tab.act-dok    { background:var(--green); color:#fff; }
+  .role-tab.act-both   { background:#92400e; color:#fff; }
+  .role-tab:not([class*=act]):hover { background:#ede8d8; }
+
+  /* ── 저장 알림 토스트 ── */
+  #saveToast {
+    position:fixed; bottom:24px; right:24px; z-index:999;
+    background:var(--navy); color:#fff; padding:10px 20px;
+    border-radius:8px; font-size:13px; font-weight:700;
+    box-shadow:0 4px 16px rgba(0,0,0,0.25);
+    opacity:0; transition:opacity 0.3s; pointer-events:none;
+  }
+  #saveToast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="data:image/jpeg;base64,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" alt="교하성당" style="height:44px;width:auto;object-fit:contain;">
+  <div>
+    <h1>교하성당 전례단 시간표 작성기</h1>
+    <p>해설자 · 독서자 배정 및 가능일 관리</p>
+  </div>
+</header>
+
+<div class="container">
+  <aside>
+    <div>
+      <div class="section-title">📅 기간 설정</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label>연도</label><input type="number" id="yearInput" value="2025" min="2000" max="2100"></div>
+        <div style="flex:1">
+          <label>월</label>
+          <select id="monthInput">
+            <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+            <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+            <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+            <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="renderCalendar()">달력 생성</button>
+    </div>
+
+    <div>
+      <div class="section-title">⛪ 요일별 고정 미사 시간</div>
+      <div style="font-size:11px;color:var(--navy);background:var(--light);border-radius:8px;padding:10px 12px;">
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:3px 6px;line-height:1.85;">
+          <span style="color:var(--red);font-weight:700">일</span><span>06:00 &nbsp;·&nbsp; 11:00</span>
+          <span style="font-weight:700">월</span><span>10:00</span>
+          <span style="font-weight:700">화</span><span>10:00 &nbsp;·&nbsp; 19:30</span>
+          <span style="font-weight:700">수</span><span>06:00 &nbsp;·&nbsp; 10:00</span>
+          <span style="font-weight:700">목</span><span>10:00 &nbsp;·&nbsp; 19:30</span>
+          <span style="font-weight:700">금</span><span>10:00</span>
+          <span style="color:#3a5bd9;font-weight:700">토</span><span>10:00 &nbsp;·&nbsp; 18:00</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--gray);line-height:1.9;background:var(--light);border-radius:8px;padding:8px 10px;">
+        🔹 <b>첫째 토</b> 10:00 (성모신심)묵주기도<br>
+        🔹 <b>둘째 목</b> 10:00 (성소)묵주기도<br>
+        🔹 <b>둘째 금</b> 10:00 (추모)<br>
+        🔹 <b>둘째 토</b> 10:00 (민족화해)묵주기도<br>
+        🔹 <b>둘째 수</b> 10:00 (천사)<br>
+        🔹 <b>넷째 화</b> 19:30 (회합)<br>
+        🔹 <b>넷째 토</b> 10:00 (찬미)
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">👥 봉사자 명단</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">이름 클릭 → 역할 · 가능일 / 불가일 설정</p>
+      <div class="member-add">
+        <input type="text" id="newMember" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addMember()" style="flex:1">
+        <select id="newMemberRole" style="width:68px;padding:7px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;font-family:inherit;background:var(--cell-bg);color:var(--navy);cursor:pointer">
+          <option value="both">양쪽</option>
+          <option value="haesul">해설</option>
+          <option value="dok">독서</option>
+        </select>
+        <button onclick="addMember()">+</button>
+      </div>
+      <div class="member-list" id="memberList" style="margin-top:8px"></div>
+    </div>
+
+    <div>
+      <div class="section-title">💾 데이터 저장/불러오기</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">입력 내용은 자동 저장됩니다.<br>파일로 내보내거나 불러올 수 있습니다.</p>
+      <button class="btn btn-primary" onclick="exportData()" style="margin-bottom:4px">📤 파일로 내보내기</button>
+      <label class="btn btn-outline" style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:4px">
+        📥 파일에서 불러오기
+        <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
+      </label>
+      <button class="btn btn-outline" onclick="clearStorage()" style="margin-top:4px;color:var(--red);border-color:var(--red)">🗑️ 저장 데이터 초기화</button>
+    </div>
+
+    <div>
+      <div class="section-title">🎲 자동 배정</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">설정된 가능일/불가일을 반영해 순환 배정합니다</p>
+      <button class="btn btn-gold" onclick="autoAssign()">자동 배정 실행</button>
+      <button class="btn btn-outline" onclick="clearAll()">전체 초기화</button>
+    </div>
+
+    <div>
+      <div class="section-title">🖨️ 출력</div>
+      <button class="btn btn-primary" onclick="window.print()">인쇄 / PDF 저장</button>
+    </div>
+
+    <div>
+      <div class="section-title">✝️ 월별 주요 전례</div>
+      <div class="missa-panel">
+        <div class="missa-panel-header">
+          <span class="missa-logo">✠</span>
+          <div>
+            <div class="missa-title">한국천주교주교회의</div>
+            <div class="missa-sub">매일미사 · 월별 주요전례</div>
+          </div>
+        </div>
+        <div class="missa-month" id="missaMonthLabel"></div>
+        <a id="missaLink" href="https://missa.cbck.or.kr/" target="_blank" class="missa-btn">
+          📅 이번 달 주요 전례 보기
+        </a>
+        <a href="https://missa.cbck.or.kr/Liturgy" target="_blank" class="missa-btn missa-btn-outline">
+          📋 연간 전례력 보기
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="schedule-wrapper">
+      <div class="table-header-bar">
+        <div class="table-title" id="tableTitle"><span>6</span> 월 &nbsp; 전례단 해설, 독서 시간표</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="sat">토</th>
+          </tr>
+        </thead>
+        <tbody id="calBody"></tbody>
+      </table>
+      <div class="footnote">
+        * 독서자는 미사시작 15분 전까지 입당하여 독서대에 올라가 읽어 봅니다.<br>
+        * 시간표 변동 시 각자 연락을 취해 주시기 바라며, 되도록이면 하루 전에 미리 연락바랍니다.
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 배정 모달 -->
+<div class="modal-overlay" id="assignOverlay" onclick="closeAssignIfOutside(event)">
+  <div class="modal">
+    <h2 id="assignTitle">미사 배정</h2>
+    <div class="modal-slot-list" id="modalSlotList"></div>
+    <button class="add-slot-btn" style="margin-top:8px" onclick="addModalSlot()">+ 미사 추가</button>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeAssign()">취소</button>
+      <button class="btn btn-primary" onclick="saveAssign()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 가능일 모달 -->
+<div class="modal-overlay" id="availOverlay" onclick="closeAvailIfOutside(event)">
+  <div class="modal wide">
+    <h2>📆 가능일 / 불가일 설정</h2>
+    <div class="avail-name" id="availName"></div>
+
+    <!-- 역할 선택 -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gray);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)">역할 선택</div>
+      <div class="role-tabs">
+        <button class="role-tab" id="roleTabHaesul" onclick="setMemberRole('haesul')">📢 해설</button>
+        <button class="role-tab" id="roleTabDok"    onclick="setMemberRole('dok')">📖 독서</button>
+        <button class="role-tab" id="roleTabBoth"   onclick="setMemberRole('both')">✨ 해설·독서</button>
+      </div>
+    </div>
+
+    <div class="avail-tabs">
+      <button class="avail-tab" id="tabOk"    onclick="setMode('ok')">✅ 가능한 날</button>
+      <button class="avail-tab" id="tabOff"   onclick="setMode('off')">❌ 안되는 날</button>
+      <button class="avail-tab" id="tabClear" onclick="setMode('clear')">🔄 지정 취소</button>
+    </div>
+
+    <div class="avail-cal" id="availCal"></div>
+
+    <div class="legend">
+      <span><span class="ldot" style="background:#d4f0e2;border:1.5px solid #1a7a4a"></span>가능</span>
+      <span><span class="ldot" style="background:#fde8e8;border:1.5px solid #c0392b"></span>불가</span>
+      <span><span class="ldot" style="background:var(--cell-bg);border:1.5px solid var(--border)"></span>미지정(기본 가능)</span>
+    </div>
+
+    <div class="tip-box">
+      💡 <b>미지정</b> = 언제든 배정 가능(기본값)<br>
+      <b>가능일 지정</b> 시 → 해당 날짜에만 배정됨<br>
+      <b>불가일 지정</b> 시 → 해당 날짜 배정에서 제외됨<br>
+      같은 날짜를 다시 누르면 지정이 취소됩니다
+    </div>
+
+    <!-- ⏰ 시간대별 불가 설정 -->
+    <div class="timeoff-section">
+      <div class="section-title" style="margin-bottom:10px">⏰ 미사 시간대별 불가 설정</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:10px">
+        해당 요일의 특정 미사 시간에 참여 불가인 경우 클릭하세요 <span style="color:var(--red);font-weight:700">(빨간색 = 불가)</span>
+      </p>
+      <div id="timeOffGrid"></div>
+      <div class="timeoff-summary" id="timeOffSummary"></div>
+    </div>
+
+    <!-- ✅ 시간대별 가능 설정 -->
+    <div class="timeoff-section">
+      <div class="section-title" style="margin-bottom:10px">✅ 미사 시간대별 가능 설정</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:10px">
+        특정 시간대에만 배정 가능한 경우 클릭하세요 <span style="color:var(--green);font-weight:700">(초록색 = 해당 시간만 가능)</span><br>
+        <span style="font-size:10px;color:#aaa">※ 가능 시간을 지정하면 지정된 시간에만 배정됩니다</span>
+      </p>
+      <div id="timeOnGrid"></div>
+      <div class="timeoff-summary" id="timeOnSummary"></div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeAvail()">닫기</button>
+      <button class="btn btn-primary" onclick="closeAvail()">확인</button>
+    </div>
+  </div>
+</div>
+
+<div id="saveToast">💾 저장되었습니다</div>
+
+<script>
+const TODAY = new Date();
+
+// ── 대한민국 공휴일 ──
+const KR_HOLIDAY_BY_YEAR = {
+  2025: {
+    '2025-01-01':'신정',
+    '2025-01-28':'설날 전날','2025-01-29':'설날','2025-01-30':'설날 다음날',
+    '2025-03-01':'삼일절','2025-03-03':'삼일절 대체공휴일',
+    '2025-05-05':'어린이날',
+    '2025-05-06':'부처님오신날',
+    '2025-06-06':'현충일',
+    '2025-08-15':'광복절',
+    '2025-09-05':'추석 전날','2025-09-06':'추석','2025-09-07':'추석 다음날',
+    '2025-10-03':'개천절','2025-10-09':'한글날',
+    '2025-12-25':'크리스마스',
+  },
+  2026: {
+    '2026-01-01':'신정',
+    '2026-02-16':'설날 전날','2026-02-17':'설날','2026-02-18':'설날 다음날',
+    '2026-03-01':'삼일절','2026-03-02':'삼일절 대체공휴일',
+    '2026-05-01':'근로자의 날','2026-05-05':'어린이날',
+    '2026-05-24':'부처님오신날','2026-05-25':'부처님오신날 대체공휴일',
+    '2026-06-03':'지방선거 임시공휴일','2026-06-06':'현충일',
+    '2026-07-17':'제헌절',
+    '2026-08-15':'광복절','2026-08-17':'광복절 대체공휴일',
+    '2026-09-24':'추석 전날','2026-09-25':'추석','2026-09-26':'추석 다음날',
+    '2026-10-03':'개천절','2026-10-05':'개천절 대체공휴일',
+    '2026-10-09':'한글날',
+    '2026-12-25':'크리스마스',
+  },
+  2027: {
+    '2027-01-01':'신정',
+    '2027-02-06':'설날 전날','2027-02-07':'설날','2027-02-08':'설날 다음날',
+    '2027-03-01':'삼일절',
+    '2027-05-05':'어린이날','2027-05-13':'부처님오신날',
+    '2027-06-06':'현충일',
+    '2027-07-17':'제헌절',
+    '2027-08-15':'광복절','2027-08-16':'광복절 대체공휴일',
+    '2027-09-14':'추석 전날','2027-09-15':'추석','2027-09-16':'추석 다음날',
+    '2027-10-03':'개천절','2027-10-04':'개천절 대체공휴일',
+    '2027-10-09':'한글날',
+    '2027-12-25':'크리스마스',
+  },
+};
+// 매년 동일한 고정 공휴일 (음력 아닌 것)
+const KR_FIXED_HOLIDAYS = {
+  '01-01':'신정','03-01':'삼일절','05-05':'어린이날',
+  '06-06':'현충일','08-15':'광복절','10-03':'개천절',
+  '10-09':'한글날','12-25':'크리스마스',
+};
+function getKrHoliday(dateStr) {
+  const year = parseInt(dateStr.slice(0,4));
+  const mmdd = dateStr.slice(5);
+  // 연도별 데이터 우선
+  if (KR_HOLIDAY_BY_YEAR[year] && KR_HOLIDAY_BY_YEAR[year][dateStr])
+    return KR_HOLIDAY_BY_YEAR[year][dateStr];
+  // 폴백: 고정 공휴일
+  return KR_FIXED_HOLIDAYS[mmdd] || '';
+}
+
+// ── 부활절 계산 (Gregorian algorithm) ──
+function getEaster(year) {
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3);
+  const h = (19*a + b - d - g + 15) % 30;
+  const i = Math.floor(c/4), k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7;
+  const m = Math.floor((a + 11*h + 22*l) / 451);
+  const month = Math.floor((h + l - 7*m + 114) / 31);
+  const day   = ((h + l - 7*m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function _dk(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function _ad(date, n) { const d = new Date(date); d.setDate(d.getDate()+n); return d; }
+const _moveCache = {};
+function getMoveableFeasts(year) {
+  if (_moveCache[year]) return _moveCache[year];
+  const f = {}, add = (d,n) => { const k=_dk(d); f[k]=f[k]?f[k]+' · '+n:n; };
+  const e = getEaster(year);
+  add(_ad(e,-46),'재의 수요일');
+  add(_ad(e,-7), '주님 수난 성지 주일');
+  add(_ad(e,-3), '주님 만찬 목요일');
+  add(_ad(e,-2), '주님 수난 금요일');
+  add(_ad(e,-1), '파스카 성야');
+  add(e,         '주님 부활 대축일');
+  add(_ad(e,42), '주님 승천 대축일');
+  add(_ad(e,49), '성령 강림 대축일');
+  add(_ad(e,50), '교회의 어머니 복되신 동정 마리아 기념일');
+  add(_ad(e,56), '지극히 거룩하신 삼위일체 대축일');
+  add(_ad(e,63), '지극히 거룩하신 그리스도의 성체 성혈 대축일');
+  const nov30=new Date(year,10,30), dow=nov30.getDay();
+  const adv1=_ad(nov30, dow<=3?-dow:7-dow);
+  add(_ad(adv1,-7),'온 누리의 임금이신 우리 주 예수 그리스도왕 대축일');
+  return (_moveCache[year] = f);
+}
+const FIXED_FEASTS = {
+  '01-01':'천주의 성모 마리아 대축일','01-13':'주님 세례 축일',
+  '01-17':'성 안토니오 아빠스 기념일','01-21':'성녀 아녜스 동정 순교자 기념일',
+  '01-24':'성 프란치스코 살레시오 주교 학자 기념일','01-25':'성 바오로 사도 회심 축일',
+  '01-26':'성 티모테오와 티토 주교 기념일','01-28':'성 토마스 아퀴나스 사제 학자 기념일',
+  '02-02':'주님 봉헌 축일','02-05':'성녀 아가타 동정 순교자 기념일',
+  '02-06':'성 바오로 미키와 동료 순교자 기념일','02-10':'성녀 스콜라스티카 동정녀 기념일',
+  '02-11':'루르드의 복되신 동정 마리아 기념일','02-14':'성 치릴로 수도자와 메토디오 주교 기념일',
+  '02-22':'성 베드로 사도좌 축일','02-23':'성 폴리카르포 주교 순교자 기념일',
+  '03-07':'성녀 펠리치타와 페르페투아 순교자 기념일','03-17':'성 파트리치오 주교 기념일',
+  '03-19':'성 요셉 대축일','03-23':'성 투리비오 데 모그로베호 주교 기념일',
+  '03-25':'주님 탄생 예고 대축일',
+  '04-07':'성 요한 밥티스타 드 라 살 사제 기념일','04-11':'성 스타니슬라오 주교 순교자 기념일',
+  '04-21':'성 안셀모 주교 학자 기념일',
+  '04-23':'성 게오르지오 순교자 기념일','04-25':'성 마르코 복음사가 축일',
+  '04-29':'성녀 카타리나 시에나 동정녀 학자 기념일',
+  '05-01':'성 요셉 노동자 기념일','05-02':'성 아타나시오 주교 학자 기념일',
+  '05-03':'성 필립보와 야고보 사도 축일','05-13':'파티마의 복되신 동정 마리아 기념일',
+  '05-14':'성 마티아 사도 축일','05-22':'성녀 리타 다 카시아 수도자 기념일',
+  '05-26':'성 필립보 네리 사제 기념일',
+  '05-29':'복자 윤지충 바오로와 동료 순교자 기념일 · 성 바오로 6세 교황 기념일',
+  '05-31':'복되신 동정 마리아 방문 축일',
+  '06-01':'성 유스티노 순교자 기념일','06-03':'성 가롤로 르완가와 동료 순교자 기념일',
+  '06-05':'성 보니파시오 주교 순교자 기념일','06-11':'성 바르나바 사도 기념일',
+  '06-13':'파도바의 성 안토니오 사제 학자 기념일','06-21':'성 알로이시오 곤자가 수도자 기념일',
+  '06-22':'성 요한 피셔 주교와 성 토마스 모어 순교자 기념일',
+  '06-24':'세례자 요한 탄생 대축일','06-28':'성 이레네오 주교 순교자 기념일',
+  '06-29':'성 베드로와 바오로 사도 대축일',
+  '07-03':'성 토마스 사도 축일','07-04':'성녀 엘리사벳 포르투갈 여왕 기념일',
+  '07-06':'성녀 마리아 고레티 동정 순교자 기념일','07-11':'성 베네딕토 아빠스 기념일',
+  '07-15':'성 보나벤투라 주교 학자 기념일','07-16':'가르멜산의 복되신 동정 마리아 기념일',
+  '07-22':'성녀 마리아 막달레나 축일','07-23':'성녀 비르지타 수도자 기념일',
+  '07-25':'성 야고보 사도 축일','07-26':'성 요아킴과 성녀 안나 기념일',
+  '07-29':'성녀 마르타와 마리아 · 성 라자로 기념일','07-31':'성 이냐시오 데 로욜라 사제 기념일',
+  '08-01':'성 알폰소 마리아 데 리구오리 주교 학자 기념일',
+  '08-04':'성 요한 마리아 비안네 사제 기념일','08-06':'주님 변모 축일',
+  '08-08':'성 도미니코 사제 기념일','08-10':'성 라우렌시오 부제 순교자 축일',
+  '08-11':'성녀 클라라 동정녀 기념일','08-14':'성 막시밀리아노 마리아 콜베 사제 순교자 기념일',
+  '08-15':'성모 승천 대축일','08-20':'성 베르나르도 아빠스 학자 기념일',
+  '08-21':'성 비오 10세 교황 기념일','08-22':'복되신 동정 마리아 여왕 기념일',
+  '08-24':'성 바르톨로메오 사도 축일','08-27':'성녀 모니카 기념일',
+  '08-28':'성 아우구스티노 주교 학자 기념일','08-29':'세례자 요한 순교 기념일',
+  '09-03':'성 대 그레고리오 교황 학자 기념일','09-08':'복되신 동정 마리아 탄생 축일',
+  '09-09':'성 베드로 클라베르 사제 기념일','09-13':'성 요한 크리소스토모 주교 학자 기념일',
+  '09-14':'성 십자가 현양 축일','09-15':'고통의 성모 마리아 기념일',
+  '09-16':'성 고르넬리오 교황과 성 치프리아노 주교 순교자 기념일',
+  '09-17':'성 로베르토 벨라르미노 주교 학자 기념일',
+  '09-20':'한국 103위 순교 성인 대축일','09-21':'성 마태오 사도 복음사가 축일',
+  '09-23':'성 비오 다 피에트렐치나 사제 기념일','09-27':'성 빈첸시오 드 폴 사제 기념일',
+  '09-29':'성 미카엘·가브리엘·라파엘 대천사 축일','09-30':'성 예로니모 사제 학자 기념일',
+  '10-01':'아기 예수의 성녀 데레사 동정녀 학자 기념일','10-02':'수호천사 기념일',
+  '10-04':'아씨시의 성 프란치스코 기념일','10-07':'묵주 기도의 복되신 동정 마리아 기념일',
+  '10-15':'성녀 데레사 아빌라 동정녀 학자 기념일','10-17':'성 이냐시오 안티오키아 주교 순교자 기념일',
+  '10-18':'성 루카 복음사가 축일','10-22':'교황 성 요한 바오로 2세 기념일',
+  '10-28':'성 시몬과 유다 사도 축일',
+  '11-01':'모든 성인 대축일','11-02':'위령의 날',
+  '11-03':'성 마르티노 데 포레스 수도자 기념일','11-04':'성 가롤로 보로메오 주교 기념일',
+  '11-09':'라테라노 대성전 봉헌 축일','11-10':'성 레오 1세 교황 학자 기념일',
+  '11-11':'성 마르티노 투르 주교 기념일','11-12':'성 요사팟 주교 순교자 기념일',
+  '11-17':'성녀 엘리사벳 헝가리 수도자 기념일','11-21':'복되신 동정 마리아 자헌 기념일',
+  '11-22':'성녀 체칠리아 동정 순교자 기념일','11-24':'성 안드레아 둥락 사제와 동료 순교자 기념일',
+  '11-30':'성 안드레아 사도 축일',
+  '12-03':'성 프란치스코 하비에르 사제 기념일','12-07':'성 암브로시오 주교 학자 기념일',
+  '12-08':'원죄 없이 잉태되신 동정 마리아 대축일','12-12':'과달루페의 복되신 동정 마리아 축일',
+  '12-13':'성녀 루치아 동정 순교자 기념일','12-14':'십자가의 성 요한 사제 학자 기념일',
+  '12-25':'예수 성탄 대축일','12-26':'성 스테파노 첫 순교자 축일',
+  '12-27':'성 요한 사도 복음사가 축일','12-28':'죄 없는 아기 순교자들 축일',
+};
+function getFeastName(dateStr) {
+  const [y,,m,,,d] = [dateStr[0],dateStr[1],dateStr[2],dateStr[3],dateStr[4],dateStr[5],dateStr[6],dateStr[7],dateStr[8],dateStr[9]];
+  const year = parseInt(dateStr.slice(0,4));
+  const mmdd = dateStr.slice(5);
+  const moveable = getMoveableFeasts(year);
+  const fixed = FIXED_FEASTS[mmdd] || '';
+  const move  = moveable[dateStr] || '';
+  if (move && fixed) return move + ' · ' + fixed;
+  return move || fixed;
+}
+
+// SPECIAL_LABELS 기반으로 해당 날짜의 셀 표시 항목 반환
+function getCellLabels(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow     = new Date(y, m - 1, d).getDay();
+  const weekNum = Math.ceil(d / 7);
+  return SPECIAL_LABELS.filter(sp => sp.dow === dow && sp.week === weekNum);
+}
+
+let year  = TODAY.getFullYear();
+let month = TODAY.getMonth() + 1;
+
+// ── 요일별 고정 미사 시간 (0=일, 1=월 ... 6=토) ──
+const FIXED_TIMES = {
+  0: ['06:00', '11:00'],   // 일
+  1: ['10:00'],            // 월
+  2: ['10:00', '19:30'],   // 화
+  3: ['06:00', '10:00'],   // 수
+  4: ['10:00', '19:30'],   // 목
+  5: ['10:00'],            // 금
+  6: ['10:00', '18:00'],   // 토
+};
+
+// ── 특별 미사 라벨 { dow: 요일, week: 몇째, time, note } ──
+const SPECIAL_LABELS = [
+  { dow:6, week:1, time:'10:00', note:'(성모신심)묵주기도' },  // 첫째 토
+  { dow:4, week:2, time:'10:00', note:'(성소)묵주기도'     },  // 둘째 목
+  { dow:5, week:2, time:'10:00', note:'추모'               },  // 둘째 금
+  { dow:6, week:2, time:'10:00', note:'(민족화해)묵주기도' },  // 둘째 토
+  { dow:3, week:2, time:'10:00', note:'천사'               },  // 둘째 수 (추가 미사)
+  { dow:2, week:4, time:'19:30', note:'회합'               },  // 넷째 화
+  { dow:6, week:4, time:'10:00', note:'찬미'               },  // 넷째 토
+];
+
+function getDefaultSlots(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow     = new Date(y, m-1, d).getDay();
+  const weekNum = Math.ceil(d / 7);
+
+  let times = [...(FIXED_TIMES[dow] || [])];
+  let notes = {};
+
+  SPECIAL_LABELS.forEach(sp => {
+    if (sp.dow === dow && sp.week === weekNum) {
+      if (!times.includes(sp.time)) times.push(sp.time); // 둘째 수 등 추가 미사
+      notes[sp.time] = sp.note;
+    }
+  });
+
+  // 시간순 정렬
+  times.sort((a, b) => {
+    const toMin = t => { const [h, mn] = t.split(':').map(Number); return h * 60 + mn; };
+    return toMin(a) - toMin(b);
+  });
+
+  return times.map(t => ({ time: t, note: notes[t] || '', haesul: '', dok1: '', dok2: '' }));
+}
+
+let timeSlots = ['10:00'];
+let members = [
+  '한명애','최양희','백미영','김민아','박미란','이연심','최소희','이원길',
+  '구희선','권대은','최수정','최정미','권영선','박현호','한영일','최동명',
+  '박정랑','김수민','이홍열','박경희','백영애'
+];
+
+// memberRoles[name] = 'haesul' | 'dok' | 'both'
+let memberRoles = {};
+
+// availability[name][day] = 'ok' | 'off'
+let availability = {};
+// timeOff[name][dow] = ['HH:MM', ...]  (dow: 0=일 ~ 6=토)
+let timeOff = {};
+let timeOn  = {};   // 시간대별 가능 설정: timeOn[name][dow] = ['HH:MM', ...]
+let scheduleData  = {};
+let editingDate   = null;
+let availMember   = null;
+let availMode     = 'off';
+
+// ── 로컬스토리지 저장/불러오기 ──
+function saveData() {
+  try {
+    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, scheduleData };
+    localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
+    showSaveToast();
+  } catch(e) { console.warn('저장 실패:', e); }
+}
+function loadData() {
+  try {
+    const raw = localStorage.getItem('liturgySchedule_members');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.members)      members      = data.members;
+    if (data.memberRoles)  memberRoles  = data.memberRoles;
+    if (data.availability) availability = data.availability;
+    if (data.timeOff)      timeOff      = data.timeOff;
+    if (data.timeOn)       timeOn       = data.timeOn;
+    if (data.scheduleData) scheduleData = data.scheduleData;
+    // 저장된 연월 복원 (구버전 데이터는 scheduleData 키에서 자동 감지)
+    if (data.year && data.month) {
+      year = data.year; month = data.month;
+    } else if (data.scheduleData) {
+      const keys = Object.keys(data.scheduleData).sort();
+      if (keys.length > 0) {
+        const parts = keys[keys.length - 1].split('-').map(Number);
+        year = parts[0]; month = parts[1];
+      }
+    }
+  } catch(e) { console.warn('불러오기 실패:', e); }
+}
+function showSaveToast() {
+  const t = document.getElementById('saveToast');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function exportData() {
+  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, scheduleData };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date();
+  a.download = `전례단_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  a.click();
+}
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.members)      members      = data.members;
+      if (data.memberRoles)  memberRoles  = data.memberRoles;
+      if (data.availability) availability = data.availability;
+      if (data.timeOff)      timeOff      = data.timeOff;
+      if (data.timeOn)       timeOn       = data.timeOn;
+      if (data.scheduleData) scheduleData = data.scheduleData;
+      // 연월 복원: 명시된 값 우선, 없으면 scheduleData 키에서 자동 감지 (구버전 호환)
+      if (data.year && data.month) {
+        year = data.year; month = data.month;
+      } else if (data.scheduleData) {
+        const keys = Object.keys(data.scheduleData).sort();
+        if (keys.length > 0) {
+          const parts = keys[keys.length - 1].split('-').map(Number);
+          year = parts[0]; month = parts[1];
+        }
+      }
+      document.getElementById('yearInput').value  = year;
+      document.getElementById('monthInput').value = month;
+      renderMemberList();
+      renderCalendar();
+      saveData();
+      alert('✅ 데이터를 불러왔습니다.');
+    } catch(err) { alert('❌ 파일을 읽을 수 없습니다.'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+function clearStorage() {
+  if (!confirm('저장된 봉사자 명단, 역할, 가능일, 전례표 데이터를 모두 초기화할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+  localStorage.removeItem('liturgySchedule_members');
+  members = []; memberRoles = {}; availability = {}; timeOff = {}; timeOn = {}; scheduleData = {};
+  renderMemberList(); renderCalendar();
+  alert('초기화 완료');
+}
+
+// INIT
+loadData();
+document.getElementById('yearInput').value  = year;
+document.getElementById('monthInput').value = month;
+renderMemberList();
+renderCalendar();
+
+// ── TIME SLOTS (모달 내 미사 추가용 폴백) ──
+function addTimeSlot() { timeSlots.push(''); }
+
+// ── MEMBERS ──
+function getRoleInfo(name) {
+  const r = memberRoles[name] || 'both';
+  const map = {
+    haesul: { label:'해설', cls:'role-haesul' },
+    dok:    { label:'독서', cls:'role-dok' },
+    both:   { label:'해설·독서', cls:'role-both' },
+  };
+  return map[r] || map.both;
+}
+function getAvailSummary(name) {
+  const av   = availability[name] || {};
+  const days = Object.keys(av);
+  const timeOffCount = Object.values(timeOff[name] || {}).reduce((sum, arr) => sum + arr.length, 0);
+  const timeOnCount  = Object.values(timeOn[name]  || {}).reduce((sum, arr) => sum + arr.length, 0);
+  if (!days.length && !timeOffCount && !timeOnCount) return { label:'미지정', cls:'badge-none' };
+  const oks  = days.filter(d => av[d]==='ok').length;
+  const offs = days.filter(d => av[d]==='off').length;
+  let label = '';
+  if (oks && offs) label = `✅${oks} ❌${offs}`;
+  else if (oks)    label = `가능 ${oks}일`;
+  else if (offs)   label = `불가 ${offs}일`;
+  if (timeOffCount) label += (label ? ' · ' : '') + `⏰❌${timeOffCount}`;
+  if (timeOnCount)  label += (label ? ' · ' : '') + `⏰✅${timeOnCount}`;
+  const cls = oks ? 'badge-ok' : offs || timeOffCount ? 'badge-off' : 'badge-none';
+  return { label: label || '미지정', cls };
+}
+
+function renderMemberList() {
+  const el = document.getElementById('memberList');
+  el.innerHTML = '';
+  members.forEach((m, i) => {
+    const s = getAvailSummary(m);
+    const r = getRoleInfo(m);
+    const tag = document.createElement('div');
+    tag.className = 'member-tag';
+    tag.title = '클릭하여 역할 · 가능일/불가일 설정';
+    tag.onclick = () => openAvail(m);
+    tag.innerHTML = `
+      <span style="font-weight:500">${m}</span>
+      <div class="tag-right">
+        <span class="role-badge ${r.cls}">${r.label}</span>
+        <span class="avail-badge ${s.cls}">${s.label}</span>
+        <button class="del-btn" onclick="event.stopPropagation();deleteMember(${i})">✕</button>
+      </div>`;
+    el.appendChild(tag);
+  });
+}
+function deleteMember(i) {
+  const name = members[i];
+  members.splice(i, 1);
+  delete availability[name];
+  delete memberRoles[name];
+  delete timeOff[name];
+  delete timeOn[name];
+  renderMemberList();
+  saveData();
+}
+function addMember() {
+  const inp  = document.getElementById('newMember');
+  const role = document.getElementById('newMemberRole').value;
+  const name = inp.value.trim();
+  if (name && !members.includes(name)) {
+    members.push(name);
+    memberRoles[name] = role;
+    renderMemberList();
+    inp.value = '';
+    saveData();
+  }
+}
+
+// ── AVAILABILITY MODAL ──
+function openAvail(name) {
+  availMember = name;
+  availMode   = 'off';
+  document.getElementById('availName').textContent = `👤 ${name}`;
+  document.getElementById('availOverlay').classList.add('open');
+  updateModeTabs();
+  updateRoleTabs();
+  renderAvailCal();
+  renderTimeOffGrid();
+  renderTimeOnGrid();
+}
+function closeAvail() {
+  document.getElementById('availOverlay').classList.remove('open');
+  availMember = null;
+  renderMemberList();
+  saveData();
+}
+function closeAvailIfOutside(e) {
+  if (e.target === document.getElementById('availOverlay')) closeAvail();
+}
+function setMode(m) { availMode = m; updateModeTabs(); }
+function updateModeTabs() {
+  ['ok','off','clear'].forEach(m => {
+    const el = document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1));
+    el.className = 'avail-tab' + (availMode===m ? ` act-${m}` : '');
+  });
+}
+function setMemberRole(role) {
+  if (!availMember) return;
+  memberRoles[availMember] = role;
+  updateRoleTabs();
+}
+function updateRoleTabs() {
+  const cur = memberRoles[availMember] || 'both';
+  ['haesul','dok','both'].forEach(r => {
+    const el = document.getElementById('roleTab' + r.charAt(0).toUpperCase() + r.slice(1));
+    if (el) el.className = 'role-tab' + (cur===r ? ` act-${r}` : '');
+  });
+}
+function renderAvailCal() {
+  const cal = document.getElementById('availCal');
+  cal.innerHTML = '';
+  const heads = ['일','월','화','수','목','금','토'];
+  heads.forEach((h, i) => {
+    const d = document.createElement('div');
+    d.className = 'avail-head' + (i===0?' sun':i===6?' sat':'');
+    d.textContent = h;
+    cal.appendChild(d);
+  });
+  const firstDay    = new Date(year, month-1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const av = availability[availMember] || {};
+  for (let i = 0; i < firstDay; i++) {
+    const b = document.createElement('div'); b.className='avail-day blank'; cal.appendChild(b);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const state = av[d];
+    const div = document.createElement('div');
+    div.className = 'avail-day' + (state==='ok'?' d-ok':state==='off'?' d-off':'');
+    div.textContent = d;
+    div.onclick = () => clickAvailDay(d);
+    cal.appendChild(div);
+  }
+}
+function clickAvailDay(day) {
+  if (!availability[availMember]) availability[availMember] = {};
+  const cur = availability[availMember][day];
+  if (availMode === 'clear') {
+    delete availability[availMember][day];
+  } else if (cur === availMode) {
+    delete availability[availMember][day]; // 같은 모드 재클릭 → 취소
+  } else {
+    availability[availMember][day] = availMode;
+  }
+  renderAvailCal();
+}
+
+// ── 시간대별 불가 설정 ──
+function renderTimeOffGrid() {
+  const grid = document.getElementById('timeOffGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const dayNames  = ['일','월','화','수','목','금','토'];
+  const dayColors = ['var(--red)','var(--navy)','var(--navy)','var(--navy)','var(--navy)','var(--navy)','#3a5bd9'];
+  const memberTO  = timeOff[availMember] || {};
+
+  dayNames.forEach((dName, dow) => {
+    const times = FIXED_TIMES[dow] || [];
+    if (!times.length) return;
+
+    const row = document.createElement('div');
+    row.className = 'timeoff-row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'timeoff-daylabel';
+    lbl.style.color = dayColors[dow];
+    lbl.textContent = dName;
+    row.appendChild(lbl);
+
+    times.forEach(time => {
+      const isOff = (memberTO[dow] || []).includes(time);
+      const btn = document.createElement('button');
+      btn.className = 'timeoff-btn' + (isOff ? ' is-off' : '');
+      btn.textContent = (isOff ? '❌ ' : '') + time;
+      btn.title = isOff ? `${dName}요일 ${time} 불가 (클릭하여 해제)` : `${dName}요일 ${time} 불가로 설정`;
+      btn.onclick = () => toggleTimeOff(dow, time);
+      row.appendChild(btn);
+    });
+
+    grid.appendChild(row);
+  });
+
+  // 요약 텍스트
+  updateTimeOffSummary();
+}
+
+function toggleTimeOff(dow, time) {
+  if (!timeOff[availMember]) timeOff[availMember] = {};
+  if (!timeOff[availMember][dow]) timeOff[availMember][dow] = [];
+  const arr = timeOff[availMember][dow];
+  const idx = arr.indexOf(time);
+  if (idx >= 0) arr.splice(idx, 1);
+  else arr.push(time);
+  // 빈 배열 정리
+  if (!arr.length) delete timeOff[availMember][dow];
+  if (timeOff[availMember] && !Object.keys(timeOff[availMember]).length) delete timeOff[availMember];
+  renderTimeOffGrid();
+  renderMemberList();
+}
+
+function updateTimeOffSummary() {
+  const el = document.getElementById('timeOffSummary');
+  const memberTO = timeOff[availMember] || {};
+  const dayNames = ['일','월','화','수','목','금','토'];
+  const parts = [];
+  Object.entries(memberTO).forEach(([dow, times]) => {
+    if (times.length) parts.push(`${dayNames[dow]}요일: ${times.join(', ')}`);
+  });
+  el.textContent = parts.length ? '❌ 불가 시간: ' + parts.join(' / ') : '';
+}
+
+// ── 시간대별 가능 설정 ──
+function renderTimeOnGrid() {
+  const grid = document.getElementById('timeOnGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const dayNames  = ['일','월','화','수','목','금','토'];
+  const dayColors = ['var(--red)','var(--navy)','var(--navy)','var(--navy)','var(--navy)','var(--navy)','#3a5bd9'];
+  const memberTN  = timeOn[availMember] || {};
+
+  dayNames.forEach((dName, dow) => {
+    const times = FIXED_TIMES[dow] || [];
+    if (!times.length) return;
+
+    const row = document.createElement('div');
+    row.className = 'timeoff-row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'timeoff-daylabel';
+    lbl.style.color = dayColors[dow];
+    lbl.textContent = dName;
+    row.appendChild(lbl);
+
+    times.forEach(time => {
+      const isOn = (memberTN[dow] || []).includes(time);
+      const btn = document.createElement('button');
+      btn.className = 'timeon-btn' + (isOn ? ' is-on' : '');
+      btn.textContent = (isOn ? '✅ ' : '') + time;
+      btn.title = isOn ? `${dName}요일 ${time} 가능 지정됨 (클릭하여 해제)` : `${dName}요일 ${time} 가능으로 지정`;
+      btn.onclick = () => toggleTimeOn(dow, time);
+      row.appendChild(btn);
+    });
+
+    grid.appendChild(row);
+  });
+  updateTimeOnSummary();
+}
+
+function toggleTimeOn(dow, time) {
+  if (!timeOn[availMember]) timeOn[availMember] = {};
+  if (!timeOn[availMember][dow]) timeOn[availMember][dow] = [];
+  const arr = timeOn[availMember][dow];
+  const idx = arr.indexOf(time);
+  if (idx >= 0) arr.splice(idx, 1);
+  else arr.push(time);
+  if (!arr.length) delete timeOn[availMember][dow];
+  if (timeOn[availMember] && !Object.keys(timeOn[availMember]).length) delete timeOn[availMember];
+  renderTimeOnGrid();
+  renderMemberList();
+}
+
+function updateTimeOnSummary() {
+  const el = document.getElementById('timeOnSummary');
+  if (!el) return;
+  const memberTN = timeOn[availMember] || {};
+  const dayNames = ['일','월','화','수','목','금','토'];
+  const parts = [];
+  Object.entries(memberTN).forEach(([dow, times]) => {
+    if (times.length) parts.push(`${dayNames[dow]}요일: ${times.join(', ')}`);
+  });
+  el.textContent = parts.length ? '✅ 가능 시간: ' + parts.join(' / ') : '';
+}
+
+// ── CALENDAR ──
+function renderCalendar() {
+  year  = parseInt(document.getElementById('yearInput').value);
+  month = parseInt(document.getElementById('monthInput').value);
+  document.getElementById('tableTitle').innerHTML = `<span>${month}</span> 월 &nbsp; 전례단 해설, 독서 시간표`;
+  // 매일미사 전례력 링크 업데이트
+  const ym = `${year}${String(month).padStart(2,'0')}`;
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const missaLabel = document.getElementById('missaMonthLabel');
+  const missaLink  = document.getElementById('missaLink');
+  if (missaLabel) missaLabel.textContent = `${year}년 ${monthNames[month-1]}`;
+  if (missaLink)  missaLink.href = `https://missa.cbck.or.kr/?yyyymm=${ym}`;
+
+  const firstDay    = new Date(year, month-1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const body = document.getElementById('calBody');
+  body.innerHTML = '';
+  let day = 1;
+  const total = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+  for (let cell = 0; cell < total; cell += 7) {
+    const tr = document.createElement('tr');
+    for (let col = 0; col < 7; col++) {
+      const idx = cell + col;
+      const td  = document.createElement('td');
+      td.className = 'date-cell';
+      if (idx < firstDay || day > daysInMonth) {
+        td.classList.add('empty');
+        if (idx < firstDay) {
+          const pd = new Date(year, month-1, 0).getDate() - (firstDay - idx - 1);
+          td.innerHTML = `<span class="date-num" style="color:#ccc">${pd}</span>`;
+        }
+      } else {
+        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const d = day;
+        if (col===0) td.classList.add('sunday');
+        if (col===6) td.classList.add('saturday');
+        if (year===TODAY.getFullYear() && month===TODAY.getMonth()+1 && d===TODAY.getDate()) td.classList.add('today');
+        const nc = col===0?'sun':col===6?'sat':'';
+        const _feast   = getFeastName(dateStr);
+        const _holiday = getKrHoliday(dateStr);
+        const _cellLabels = getCellLabels(dateStr);
+        const _feastHtml   = _feast   ? `<div class="feast-day">${_feast}</div>` : '';
+        const _holidayHtml = _holiday ? `<span class="holiday-tag">🇰🇷 ${_holiday}</span>` : '';
+        const _labelsHtml  = _cellLabels.map(sp =>
+          `<span class="special-label">🔹${sp.note}</span>`).join('');
+        const _dnc = nc + (_holiday ? ' holiday' : '');
+        td.innerHTML = `<span class="date-num ${_dnc}">${d}</span>${_holidayHtml}${_labelsHtml}${_feastHtml}<div class="cell-slots" id="cs-${dateStr}"></div>`;
+        td.onclick = () => openAssign(dateStr, d, col);
+        day++;
+      }
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+    if (day > daysInMonth) break;
+  }
+
+  // 모든 행이 DOM에 삽입된 뒤 셀 슬롯 렌더링 (이전에는 td가 DOM에 없어서 getElementById가 null을 반환했음)
+  for (let d = 1; d <= daysInMonth; d++) {
+    renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  }
+}
+
+function renderCellSlots(dateStr) {
+  const c = document.getElementById(`cs-${dateStr}`);
+  if (!c) return;
+  c.innerHTML = '';
+  // 배정 데이터가 없으면 고정 시간표를 기본 표시
+  const slots = (scheduleData[dateStr] !== undefined) ? scheduleData[dateStr] : getDefaultSlots(dateStr);
+  slots.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'slot-block';
+    let html = '';
+    if (s.time) html += `<div class="slot-time">${s.time}</div>`;
+    const info = [];
+    if (s.note)   info.push(`<span style="color:#ffd770;font-weight:700;font-size:8px">(${s.note})</span>`);
+    if (s.haesul) info.push(`해설 ${s.haesul}`);
+    if (s.dok1)   info.push(`1독 ${s.dok1}`);
+    if (s.dok2)   info.push(`2독 ${s.dok2}`);
+    html += `<div>${info.join('<br>')}</div>`;
+    div.innerHTML = html;
+    c.appendChild(div);
+  });
+}
+
+// ── ASSIGN MODAL ──
+function openAssign(dateStr, day, col) {
+  editingDate = dateStr;
+  // 배정 데이터가 없으면 고정 미사 시간으로 초기화
+  if (!scheduleData[editingDate]) {
+    scheduleData[editingDate] = getDefaultSlots(dateStr);
+  }
+  const dn = ['일','월','화','수','목','금','토'];
+  document.getElementById('assignTitle').textContent = `${month}월 ${day}일 (${dn[col]}) 배정`;
+  renderModalSlots();
+  document.getElementById('assignOverlay').classList.add('open');
+}
+function closeAssign() { document.getElementById('assignOverlay').classList.remove('open'); editingDate=null; }
+function closeAssignIfOutside(e) { if(e.target===document.getElementById('assignOverlay')) closeAssign(); }
+
+function renderModalSlots() {
+  const list = document.getElementById('modalSlotList');
+  list.innerHTML = '';
+  const dayNum = parseInt(editingDate.split('-')[2]);
+  const [y, mo, d] = editingDate.split('-').map(Number);
+  const dow = new Date(y, mo-1, d).getDay();
+  (scheduleData[editingDate] || []).forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'modal-slot-item';
+    item.innerHTML = `
+      <div class="slot-header">
+        <span class="slot-label">미사 ${i+1}</span>
+        <button class="rm-btn" onclick="removeSlot(${i})">✕</button>
+      </div>
+      <div class="field"><label>미사 시간</label>
+        <input type="text" value="${s.time||''}" placeholder="예: 10:00" onchange="updSlot(${i},'time',this.value)">
+      </div>
+      <div class="field"><label>특이사항</label>
+        <input type="text" value="${s.note||''}" placeholder="예: 주님만찬" onchange="updSlot(${i},'note',this.value)">
+      </div>
+      <div class="field"><label>해설자</label>${mkSelect(s.haesul,i,'haesul',dayNum,dow,s.time)}</div>
+      <div class="field"><label>1독서</label>${mkSelect(s.dok1,i,'dok1',dayNum,dow,s.time)}</div>
+      <div class="field"><label>2독서</label>${mkSelect(s.dok2,i,'dok2',dayNum,dow,s.time)}</div>`;
+    list.appendChild(item);
+  });
+}
+
+function mkSelect(val, si, field, dayNum, dow, slotTime) {
+  // 역할에 따라 봉사자 필터링
+  const filtered = members.filter(m => {
+    const role = memberRoles[m] || 'both';
+    if (field === 'haesul') return role === 'haesul' || role === 'both';
+    if (field === 'dok1' || field === 'dok2') return role === 'dok' || role === 'both';
+    return true;
+  });
+  const opts = filtered.map(m => {
+    const av = (availability[m]||{})[dayNum];
+    let icon = av==='ok' ? ' ✅' : av==='off' ? ' ❌' : '';
+    // 시간대별 불가 체크
+    if (!icon && slotTime !== undefined && dow !== undefined) {
+      const mTO = (timeOff[m] || {})[dow] || [];
+      if (mTO.includes(slotTime)) icon = ' ⏰❌';
+    }
+    return `<option value="${m}" ${m===val?'selected':''}>${m}${icon}</option>`;
+  }).join('');
+  return `<select onchange="updSlot(${si},'${field}',this.value)"><option value="">-</option>${opts}</select>`;
+}
+
+function updSlot(i, key, val) {
+  if (!scheduleData[editingDate]) scheduleData[editingDate]=[];
+  scheduleData[editingDate][i][key] = val;
+}
+function removeSlot(i) { scheduleData[editingDate].splice(i,1); renderModalSlots(); }
+function addModalSlot() {
+  if (!scheduleData[editingDate]) scheduleData[editingDate]=[];
+  const defSlots = getDefaultSlots(editingDate);
+  const defaultTime = defSlots.length ? defSlots[0].time : '10:00';
+  scheduleData[editingDate].push({time: defaultTime, haesul:'', dok1:'', dok2:'', note:''});
+  renderModalSlots();
+}
+function saveAssign() { renderCellSlots(editingDate); closeAssign(); saveData(); }
+
+// ── AUTO ASSIGN ──
+function canAssign(name, day, time) {
+  if (time !== undefined) {
+    const dow = new Date(year, month-1, day).getDay();
+    // 불가 시간 체크
+    const mTO = (timeOff[name] || {})[dow] || [];
+    if (mTO.includes(time)) return false;
+    // 가능 시간 제한: 설정된 경우 해당 시간만 배정 가능
+    const mTN = (timeOn[name] || {})[dow] || [];
+    if (mTN.length > 0 && !mTN.includes(time)) return false;
+  }
+  // 날짜별 가능/불가 체크
+  const av = availability[name] || {};
+  const hasOkDays = Object.values(av).some(v => v==='ok');
+  if (hasOkDays) return av[day] === 'ok';
+  return av[day] !== 'off';
+}
+
+function autoAssign() {
+  if (!members.length) { alert('봉사자를 등록해주세요.'); return; }
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  // 역할별 봉사자 목록
+  const haesulMembers = members.filter(m => { const r = memberRoles[m]||'both'; return r==='haesul'||r==='both'; });
+  const dokMembers    = members.filter(m => { const r = memberRoles[m]||'both'; return r==='dok'||r==='both'; });
+  if (!haesulMembers.length) haesulMembers.push(...members);
+  if (!dokMembers.length)    dokMembers.push(...members);
+
+  let ptrs = { haesul:0, dok1:0, dok2:0 };
+
+  function pick(role, day, used, time) {
+    const pool = (role==='haesul') ? haesulMembers : dokMembers;
+    const ptr  = (role==='haesul') ? 'haesul' : role;
+    for (let t = 0; t < pool.length; t++) {
+      const m = pool[(ptrs[ptr]+t) % pool.length];
+      if (canAssign(m, day, time) && !used.includes(m)) {
+        ptrs[ptr] = (ptrs[ptr]+t+1) % pool.length;
+        return m;
+      }
+    }
+    for (let t = 0; t < pool.length; t++) {
+      const m = pool[(ptrs[ptr]+t) % pool.length];
+      if (canAssign(m, day, time)) { ptrs[ptr]=(ptrs[ptr]+t+1)%pool.length; return m; }
+    }
+    return '(미배정)';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const defaultSlots = getDefaultSlots(dateStr);
+    if (!defaultSlots.length) continue;
+
+    scheduleData[dateStr] = defaultSlots.map(s => {
+      const h  = pick('haesul', d, [], s.time);
+      const d1 = pick('dok1',   d, [h], s.time);
+      const d2 = pick('dok2',   d, [h, d1], s.time);
+      return { time: s.time, note: s.note, haesul: h, dok1: d1, dok2: d2 };
+    });
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  }
+  saveData();
+  alert('✅ 자동 배정 완료!\n가능일 / 불가일 설정이 반영되었습니다.');
+}
+
+function clearAll() {
+  if (!confirm('모든 배정을 초기화할까요?')) return;
+  scheduleData = {};
+  renderCalendar();
+  saveData();
+}
+</script>
+<footer class="church-footer">
+  <div>
+    <a href="https://sd.uca.or.kr/kyoha/" target="_blank">Sancta Familia Parochia 교하성당</a>
+  </div>
+  <div>경기도 파주시 책향기숲길 62 &nbsp;|&nbsp; Tel. 031)948-9064~5 &nbsp;|&nbsp; Fax. 031)948-9067</div>
+  <div>대표자 : 도현우 안토니오</div>
+  <div>Copyright 2019. Kyoha Cathedral. All rights reserved.</div>
+</footer>
+
+</body>
+</html>
