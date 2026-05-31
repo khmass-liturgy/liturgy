@@ -62,7 +62,7 @@
   }
   .btn-outline:hover { border-color: var(--navy); background: #f5f3ee; }
 
-  .member-list { display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto; }
+  .member-list { display: flex; flex-direction: column; gap: 5px; max-height: 400px; overflow-y: auto; }
   .member-tag {
     display: flex; align-items: center; justify-content: space-between;
     background: var(--light); border-radius: 6px; padding: 6px 10px; font-size: 13px;
@@ -106,7 +106,7 @@
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   thead th {
     background: var(--navy); color: var(--white);
-    padding: 9px 4px; font-size: 13px; font-weight: 700;
+    padding: 9px 4px; font-size: 15px; font-weight: 700;
     text-align: center; border: 1px solid rgba(255,255,255,0.1);
   }
   thead th.sun { color: #ff8a8a; }
@@ -123,7 +123,7 @@
   td.date-cell.empty   { background: #ebebeb; cursor: default; }
   td.date-cell.today   { outline: 2px solid var(--gold); outline-offset: -2px; }
 
-  .date-num { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; display: block; }
+  .date-num { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 3px; display: block; }
   .date-num.sun { color: var(--red); }
   .date-num.sat { color: #3a5bd9; }
   .date-num.holiday { color: var(--red) !important; }
@@ -131,7 +131,7 @@
   .cell-slots { display: flex; flex-direction: column; gap: 2px; }
   .slot-block {
     background: var(--navy); color: var(--white);
-    border-radius: 4px; padding: 3px 4px; font-size: 9px; line-height: 1.5; text-align: left;
+    border-radius: 4px; padding: 3px 4px; font-size: 15px; line-height: 1.5; text-align: left;
   }
   .slot-block .slot-time { font-weight: 700; color: var(--gold); }
 
@@ -285,14 +285,15 @@
     .holiday-tag { display:none; }
   }
   .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
-  .feast-day { font-size:8px; color:var(--red); font-weight:700; line-height:1.4; margin:1px 0 2px; word-break:keep-all; text-align:left; padding:0 2px; }
-  .holiday-tag { font-size:8px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:1px 0 2px; display:inline-block; word-break:keep-all; }
+  .feast-day { font-size:10px; color:var(--red); font-weight:700; line-height:1.4; margin:2px 0 0; word-break:keep-all; text-align:left; padding:0 2px; }
+  .holiday-tag { font-size:10px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:2px 0 0; display:inline-block; word-break:keep-all; }
   .special-label { font-size:16px; font-weight:700; border-radius:3px; padding:1px 5px; margin:1px 1px 1px 0; display:inline-block; word-break:keep-all; background:#e8eeff; color:#2240c4; }
 
   /* ── 역할 배지 ── */
   .role-badge { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:700; white-space:nowrap; }
   .role-haesul { background:#dbeafe; color:#1e40af; }
   .role-dok     { background:#d4f0e2; color:var(--green); }
+  .member-tag-editing { outline: 2px solid var(--navy); background: #eef3fb !important; }
   .role-both    { background:#fef3c7; color:#92400e; }
   .role-none    { background:#eee; color:#999; }
 
@@ -315,6 +316,7 @@
   }
   #saveToast.show { opacity:1; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 </head>
 <body>
 
@@ -346,6 +348,26 @@
     </div>
 
     <div>
+      <div class="section-title">👥 봉사자 명단</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:8px" id="memberHint">이름 클릭 → 역할 수정 · 가능일/불가일 설정</p>
+      <div class="member-add">
+        <input type="text" id="newMember" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addMember()" style="flex:1">
+        <select id="newMemberRole" style="width:68px;padding:7px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;font-family:inherit;background:var(--cell-bg);color:var(--navy);cursor:pointer">
+          <option value="both">양쪽</option>
+          <option value="haesul">해설</option>
+          <option value="dok">독서</option>
+        </select>
+        <button id="memberSaveBtn" onclick="addMember()">+</button>
+      </div>
+      <!-- 수정 모드 버튼 (이름 클릭 시 표시) -->
+      <div id="memberEditBar" style="display:none;margin-top:6px;gap:5px;display:none;align-items:center">
+        <button onclick="saveMemberEdit()" style="flex:1;padding:6px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✅ 저장</button>
+        <button onclick="cancelMemberEdit()" style="flex:1;padding:6px;background:var(--light);color:var(--navy);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✕ 취소</button>
+      </div>
+      <div class="member-list" id="memberList" style="margin-top:8px"></div>
+    </div>
+
+    <div>
       <div class="section-title">⛪ 요일별 고정 미사 시간</div>
       <div style="font-size:11px;color:var(--navy);background:var(--light);border-radius:8px;padding:10px 12px;">
         <div style="display:grid;grid-template-columns:28px 1fr;gap:3px 6px;line-height:1.85;">
@@ -359,29 +381,15 @@
         </div>
       </div>
       <div style="margin-top:8px;font-size:10px;color:var(--gray);line-height:1.9;background:var(--light);border-radius:8px;padding:8px 10px;">
-        🔹 <b>첫째 토</b> 10:00 (성모신심)묵주기도<br>
-        🔹 <b>둘째 목</b> 10:00 (성소)묵주기도<br>
+        🔹 <b>첫째 금</b> 19:30 (성시간)<br>
+        🔹 <b>첫째 토</b> 10:00 (성모신심) 📿<br>
+        🔹 <b>둘째 목</b> 10:00 (성소) 📿<br>
         🔹 <b>둘째 금</b> 10:00 (추모)<br>
-        🔹 <b>둘째 토</b> 10:00 (민족화해)묵주기도<br>
+        🔹 <b>둘째 토</b> 10:00 (민족화해) 📿<br>
         🔹 <b>둘째 수</b> 10:00 (천사)<br>
         🔹 <b>넷째 화</b> 19:30 (회합)<br>
         🔹 <b>넷째 토</b> 10:00 (찬미)
       </div>
-    </div>
-
-    <div>
-      <div class="section-title">👥 봉사자 명단</div>
-      <p style="font-size:11px;color:var(--gray);margin-bottom:8px">이름 클릭 → 역할 · 가능일 / 불가일 설정</p>
-      <div class="member-add">
-        <input type="text" id="newMember" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addMember()" style="flex:1">
-        <select id="newMemberRole" style="width:68px;padding:7px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;font-family:inherit;background:var(--cell-bg);color:var(--navy);cursor:pointer">
-          <option value="both">양쪽</option>
-          <option value="haesul">해설</option>
-          <option value="dok">독서</option>
-        </select>
-        <button onclick="addMember()">+</button>
-      </div>
-      <div class="member-list" id="memberList" style="margin-top:8px"></div>
     </div>
 
     <div>
@@ -405,6 +413,7 @@
     <div>
       <div class="section-title">🖨️ 출력</div>
       <button class="btn btn-primary" onclick="window.print()">인쇄 / PDF 저장</button>
+      <button class="btn btn-gold" onclick="exportExcel()" style="margin-top:6px">📊 엑셀로 저장</button>
     </div>
 
     <div>
@@ -483,6 +492,7 @@
       <button class="avail-tab" id="tabOff"   onclick="setMode('off')">❌ 안되는 날</button>
       <button class="avail-tab" id="tabClear" onclick="setMode('clear')">🔄 지정 취소</button>
     </div>
+    <button onclick="clearAllAvail()" style="width:100%;margin-bottom:12px;padding:8px;background:#f0f0f0;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;color:#555;cursor:pointer;font-family:inherit;" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f0f0f0'">🗑️ 전체 지정 취소</button>
 
     <div class="avail-cal" id="availCal"></div>
 
@@ -728,14 +738,17 @@ const FIXED_TIMES = {
 };
 
 // ── 특별 미사 라벨 { dow: 요일, week: 몇째, time, note } ──
+const ROSARY = "📿";
+
 const SPECIAL_LABELS = [
-  { dow:6, week:1, time:'10:00', note:'(성모신심)묵주기도' },  // 첫째 토
-  { dow:4, week:2, time:'10:00', note:'(성소)묵주기도'     },  // 둘째 목
-  { dow:5, week:2, time:'10:00', note:'추모'               },  // 둘째 금
-  { dow:6, week:2, time:'10:00', note:'(민족화해)묵주기도' },  // 둘째 토
-  { dow:3, week:2, time:'10:00', note:'천사'               },  // 둘째 수 (추가 미사)
-  { dow:2, week:4, time:'19:30', note:'회합'               },  // 넷째 화
-  { dow:6, week:4, time:'10:00', note:'찬미'               },  // 넷째 토
+  { dow:6, week:1, time:'10:00', note:'(성모신심)' },  // 첫째 토
+  { dow:5, week:1, time:'19:30', note:'성시간'     },  // 첫째 금
+  { dow:4, week:2, time:'10:00', note:'(성소)'     },  // 둘째 목
+  { dow:5, week:2, time:'10:00', note:'추모'       },  // 둘째 금
+  { dow:6, week:2, time:'10:00', note:'(민족화해)' },  // 둘째 토
+  { dow:3, week:2, time:'10:00', note:'천사'       },  // 둘째 수 (추가 미사)
+  { dow:2, week:4, time:'19:30', note:'회합'       },  // 넷째 화
+  { dow:6, week:4, time:'10:00', note:'찬미'       },  // 넷째 토
 ];
 
 function getDefaultSlots(dateStr) {
@@ -771,6 +784,7 @@ let members = [
 
 // memberRoles[name] = 'haesul' | 'dok' | 'both'
 let memberRoles = {};
+let editingMemberName = null;
 
 // availability[name][day] = 'ok' | 'off'
 let availability = {};
@@ -821,12 +835,20 @@ function showSaveToast() {
 }
 function exportData() {
   const data = { year, month, members, memberRoles, availability, timeOff, timeOn, scheduleData };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const json = JSON.stringify(data, null, 2);
   const d = new Date();
-  a.download = `전례단_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  // UTF-8 바이트 → base64 (한글 포함 안전 처리)
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
+  const a = document.createElement('a');
+  a.href = 'data:application/json;base64,' + b64;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 function importData(event) {
   const file = event.target.files[0];
@@ -914,19 +936,123 @@ function renderMemberList() {
   members.forEach((m, i) => {
     const s = getAvailSummary(m);
     const r = getRoleInfo(m);
+    const isEditing = (m === editingMemberName);
     const tag = document.createElement('div');
-    tag.className = 'member-tag';
-    tag.title = '클릭하여 역할 · 가능일/불가일 설정';
-    tag.onclick = () => openAvail(m);
-    tag.innerHTML = `
-      <span style="font-weight:500">${m}</span>
-      <div class="tag-right">
-        <span class="role-badge ${r.cls}">${r.label}</span>
-        <span class="avail-badge ${s.cls}">${s.label}</span>
-        <button class="del-btn" onclick="event.stopPropagation();deleteMember(${i})">✕</button>
-      </div>`;
+    tag.className = 'member-tag' + (isEditing ? ' member-tag-editing' : '');
+    tag.title = '클릭 → 가능일/역할 설정 | 이름 수정은 위 입력칸 이용';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.style.cssText = 'font-weight:500;cursor:pointer;flex:1';
+    nameSpan.textContent = m;
+    nameSpan.addEventListener('click', () => openAvail(m));
+
+    const tagRight = document.createElement('div');
+    tagRight.className = 'tag-right';
+
+    const roleBadge = document.createElement('span');
+    roleBadge.className = `role-badge ${r.cls}`;
+    roleBadge.style.cursor = 'pointer';
+    roleBadge.textContent = r.label;
+    roleBadge.addEventListener('click', () => openAvail(m));
+
+    const availBadge = document.createElement('span');
+    availBadge.className = `avail-badge ${s.cls}`;
+    availBadge.style.cursor = 'pointer';
+    availBadge.title = '가능일/불가일 설정';
+    availBadge.textContent = s.label;
+    availBadge.addEventListener('click', (e) => { e.stopPropagation(); openAvail(m); });
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'del-btn';
+    editBtn.textContent = '✏️';
+    editBtn.title = '이름/역할 수정';
+    editBtn.style.cssText = 'font-size:11px;background:var(--light);';
+    editBtn.addEventListener('click', (e) => { e.stopPropagation(); startMemberEdit(m); });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-btn';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteMember(i); });
+
+    tagRight.appendChild(roleBadge);
+    tagRight.appendChild(availBadge);
+    tagRight.appendChild(editBtn);
+    tagRight.appendChild(delBtn);
+    tag.appendChild(nameSpan);
+    tag.appendChild(tagRight);
     el.appendChild(tag);
   });
+}
+
+function startMemberEdit(name) {
+  editingMemberName = name;
+  const inp  = document.getElementById('newMember');
+  const role = document.getElementById('newMemberRole');
+  const btn  = document.getElementById('memberSaveBtn');
+  const bar  = document.getElementById('memberEditBar');
+  const hint = document.getElementById('memberHint');
+
+  inp.value = name;
+  role.value = memberRoles[name] || 'both';
+  btn.textContent = '✏️';
+  btn.title = '저장';
+  bar.style.display = 'flex';
+  hint.innerHTML = `<span style="color:var(--navy);font-weight:700">✏️ "${name}" 수정 중</span>`;
+  inp.focus();
+  inp.select();
+  renderMemberList();
+}
+
+function saveMemberEdit() {
+  const inp     = document.getElementById('newMember');
+  const roleEl  = document.getElementById('newMemberRole');
+  const newName = inp.value.trim();
+  const newRole = roleEl.value;
+  if (!newName) { alert('이름을 입력해주세요.'); return; }
+  if (newName !== editingMemberName && members.includes(newName)) {
+    alert('이미 있는 이름입니다.'); return;
+  }
+  const idx = members.indexOf(editingMemberName);
+  if (idx === -1) { cancelMemberEdit(); return; }
+
+  // 이름 변경 처리
+  if (newName !== editingMemberName) {
+    members[idx] = newName;
+    memberRoles[newName]  = newRole;
+    availability[newName] = availability[editingMemberName];
+    timeOff[newName]      = timeOff[editingMemberName];
+    timeOn[newName]       = timeOn[editingMemberName];
+    delete memberRoles[editingMemberName];
+    delete availability[editingMemberName];
+    delete timeOff[editingMemberName];
+    delete timeOn[editingMemberName];
+    // scheduleData 내 이름도 교체
+    Object.values(scheduleData).forEach(slots => slots.forEach(s => {
+      if (s.haesul === editingMemberName) s.haesul = newName;
+      if (s.dok1   === editingMemberName) s.dok1   = newName;
+      if (s.dok2   === editingMemberName) s.dok2   = newName;
+    }));
+  } else {
+    memberRoles[editingMemberName] = newRole;
+  }
+
+  cancelMemberEdit();
+  renderCalendar();
+  saveData();
+}
+
+function cancelMemberEdit() {
+  editingMemberName = null;
+  const inp  = document.getElementById('newMember');
+  const btn  = document.getElementById('memberSaveBtn');
+  const bar  = document.getElementById('memberEditBar');
+  const hint = document.getElementById('memberHint');
+  inp.value        = '';
+  btn.textContent  = '+';
+  btn.title        = '';
+  bar.style.display = 'none';
+  hint.textContent = '이름 클릭 → 역할 수정 · 가능일/불가일 설정';
+  renderMemberList();
 }
 function deleteMember(i) {
   const name = members[i];
@@ -939,6 +1065,7 @@ function deleteMember(i) {
   saveData();
 }
 function addMember() {
+  if (editingMemberName) { saveMemberEdit(); return; }
   const inp  = document.getElementById('newMember');
   const role = document.getElementById('newMemberRole').value;
   const name = inp.value.trim();
@@ -973,6 +1100,25 @@ function closeAvailIfOutside(e) {
   if (e.target === document.getElementById('availOverlay')) closeAvail();
 }
 function setMode(m) { availMode = m; updateModeTabs(); }
+
+function clearAllAvail() {
+  if (!availMember) return;
+  availability[availMember] = {};
+  timeOff[availMember]      = {};
+  timeOn[availMember]       = {};
+  renderAvailCal();
+  renderTimeOffGrid();
+  renderTimeOnGrid();
+  saveData();
+  // 버튼 시각 피드백
+  const btn = document.querySelector('[onclick="clearAllAvail()"]');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✅ 취소 완료!';
+    btn.style.background = '#d4f0e2';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = '#f0f0f0'; }, 1200);
+  }
+}
 function updateModeTabs() {
   ['ok','off','clear'].forEach(m => {
     const el = document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1));
@@ -1202,7 +1348,7 @@ function renderCalendar() {
         const _labelsHtml  = _cellLabels.map(sp =>
           `<span class="special-label">🔹${sp.note}</span>`).join('');
         const _dnc = nc + (_holiday ? ' holiday' : '');
-        td.innerHTML = `<span class="date-num ${_dnc}">${d}</span>${_holidayHtml}${_labelsHtml}${_feastHtml}<div class="cell-slots" id="cs-${dateStr}"></div>`;
+        td.innerHTML = `<span class="date-num ${_dnc}">${d}</span><div class="cell-slots" id="cs-${dateStr}"></div>${_holidayHtml}${_feastHtml}`;
         td.onclick = () => openAssign(dateStr, d, col);
         day++;
       }
@@ -1224,17 +1370,20 @@ function renderCellSlots(dateStr) {
   c.innerHTML = '';
   // 배정 데이터가 없으면 고정 시간표를 기본 표시
   const slots = (scheduleData[dateStr] !== undefined) ? scheduleData[dateStr] : getDefaultSlots(dateStr);
+  const rosaryNotes = ['(성모신심)','(성소)','(민족화해)'];
   slots.forEach(s => {
     const div = document.createElement('div');
     div.className = 'slot-block';
-    let html = '';
-    if (s.time) html += `<div class="slot-time">${s.time}</div>`;
-    const info = [];
-    if (s.note)   info.push(`<span style="color:#ffd770;font-weight:700;font-size:8px">(${s.note})</span>`);
-    if (s.haesul) info.push(`해설 ${s.haesul}`);
-    if (s.dok1)   info.push(`1독 ${s.dok1}`);
-    if (s.dok2)   info.push(`2독 ${s.dok2}`);
-    html += `<div>${info.join('<br>')}</div>`;
+    let html = '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">';
+    if (s.time) html += `<span class="slot-time">${s.time}</span>`;
+    if (s.note) {
+      const isRosary = rosaryNotes.includes(s.note);
+      html += `<span style="color:#ffd770;font-weight:700;font-size:13px">${s.note}${isRosary ? ROSARY : ''}</span>`;
+    }
+    if (s.haesul) html += `<span>해설 ${s.haesul}</span>`;
+    if (s.dok1)   html += `<span>1독 ${s.dok1}</span>`;
+    if (s.dok2)   html += `<span>2독 ${s.dok2}</span>`;
+    html += '</div>';
     div.innerHTML = html;
     c.appendChild(div);
   });
@@ -1270,7 +1419,7 @@ function renderModalSlots() {
         <button class="rm-btn" onclick="removeSlot(${i})">✕</button>
       </div>
       <div class="field"><label>미사 시간</label>
-        <input type="text" value="${s.time||''}" placeholder="예: 10:00" onchange="updSlot(${i},'time',this.value)">
+        ${mkTimeSelect(s.time||'', i)}
       </div>
       <div class="field"><label>특이사항</label>
         <input type="text" value="${s.note||''}" placeholder="예: 주님만찬" onchange="updSlot(${i},'note',this.value)">
@@ -1280,6 +1429,24 @@ function renderModalSlots() {
       <div class="field"><label>2독서</label>${mkSelect(s.dok2,i,'dok2',dayNum,dow,s.time)}</div>`;
     list.appendChild(item);
   });
+}
+
+// ── 미사 시간 드롭다운 ──
+const ALL_TIMES = ['06:00', '10:00', '11:00', '18:00', '19:30'];
+
+function mkTimeSelect(val, si) {
+  const [y, mo, d] = editingDate.split('-').map(Number);
+  const dow = new Date(y, mo-1, d).getDay();
+  // 해당 요일의 고정 시간 + 전체 시간 목록 합치기 (중복 제거)
+  const fixedTimes = FIXED_TIMES[dow] || [];
+  const allOpts = [...new Set([...fixedTimes, ...ALL_TIMES])].sort((a, b) => {
+    const toMin = t => { const [h, mn] = t.split(':').map(Number); return h * 60 + mn; };
+    return toMin(a) - toMin(b);
+  });
+  const opts = allOpts.map(t =>
+    `<option value="${t}" ${t === val ? 'selected' : ''}>${t}</option>`
+  ).join('');
+  return `<select onchange="updSlot(${si},'time',this.value)">${opts}</select>`;
 }
 
 function mkSelect(val, si, field, dayNum, dow, slotTime) {
@@ -1389,6 +1556,333 @@ function clearAll() {
   scheduleData = {};
   renderCalendar();
   saveData();
+}
+
+// ── 엑셀 내보내기 (원본 서식 재현) ──
+async function exportExcel() {
+  if (typeof ExcelJS === 'undefined') {
+    alert('엑셀 라이브러리를 불러오는 중입니다.\n잠시 후 다시 시도해주세요. (인터넷 연결 필요)');
+    return;
+  }
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  // 날짜 → 주차 블록(일~토) 그룹핑
+  const weeks = [];
+  let week = Array(7).fill(null); // 0=일..6=토
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month-1, d).getDay(); // 0=일..6=토
+    week[dow] = d;
+    if (dow === 6) { weeks.push([...week]); week = Array(7).fill(null); }
+  }
+  if (week.some(v => v !== null)) weeks.push(week);
+
+  function getSlot(d, timeStr, field) {
+    if (!d) return '';
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const slots = scheduleData[ds] || getDefaultSlots(ds);
+    const s = slots.find(x => x.time === timeStr);
+    return s ? (s[field] || '') : '';
+  }
+  function getNote(d, timeStr) {
+    if (!d) return '';
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const slots = scheduleData[ds] || getDefaultSlots(ds);
+    const s = slots.find(x => x.time === timeStr);
+    return s ? (s.note || '') : '';
+  }
+
+  const wb = new ExcelJS.Workbook();
+  const sheetName = `${String(year).slice(2)}${String(month).padStart(2,'0')}`;
+  const ws = wb.addWorksheet(sheetName);
+
+  // ── 열 너비 ──
+  const colWidths = [9,13,13,11,11,11,11,11,9, 5,13,6,6,6,16,13];
+  colWidths.forEach((w, i) => { ws.getColumn(i+1).width = w; });
+
+  // 스타일 헬퍼
+  const bgGray = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} };
+  const fTitle  = { name:'HY동녘B',   size:16, bold:true };
+  const fHdrRed = { name:'맑은 고딕', size:13, bold:true, color:{argb:'FFFF0000'} };
+  const fHdrBlk = { name:'맑은 고딕', size:13, bold:true };
+  const fHdrSm  = { name:'맑은 고딕', size:11, bold:true };
+  const fBold   = { name:'맑은 고딕', size:10, bold:true };
+  const fNorm   = { name:'맑은 고딕', size:10 };
+  const fNote   = { name:'맑은 고딕', size:9  };
+  const aC = { horizontal:'center', vertical:'middle' };
+  const aL = { horizontal:'left',   vertical:'middle' };
+  const thin = { style:'thin' };
+  const dbl  = { style:'double' };
+
+  function setBorder(cell, l,r,t,b) {
+    cell.border = {
+      left:   l ? {style:l} : undefined,
+      right:  r ? {style:r} : undefined,
+      top:    t ? {style:t} : undefined,
+      bottom: b ? {style:b} : undefined,
+    };
+  }
+
+  // ── 행1: 제목 ──
+  ws.getRow(1).height = 22;
+  const r1 = ws.getRow(1);
+  r1.getCell(2).value = year;
+  r1.getCell(2).font  = { name:'맑은 고딕', size:14, bold:true };
+  r1.getCell(3).value = `${month}월`;
+  r1.getCell(3).font  = fTitle;
+  r1.getCell(4).value = '   전례단 해설,  독서  시간표';
+  r1.getCell(4).font  = fTitle;
+  ws.mergeCells('D1:I1');
+
+  // ── 행2: 요일 헤더 ──
+  ws.getRow(2).height = 22;
+  ws.mergeCells('A2:B2'); ws.mergeCells('H2:I2');
+  const dayHdrs = [[1,'일',true],[3,'월',false],[4,'화',false],[5,'수',false],[6,'목',false],[7,'금',false],[8,'토',false]];
+  dayHdrs.forEach(([ci, label, isSun]) => {
+    const c = ws.getRow(2).getCell(ci);
+    c.value = label;
+    c.font  = isSun ? fHdrRed : (label==='토' ? {...fHdrBlk,color:{argb:'FF0000FF'}} : fHdrBlk);
+    c.fill  = bgGray;
+    c.alignment = aC;
+    c.border = { left:thin, right:thin, top:thin, bottom:dbl };
+  });
+  // 봉사자 명단 헤더 (J=번호, K=이름, L=해설, M=독서, N=합계, O=요일, P=행사)
+  [
+    [10, '번호'], [11, '이름'], [12, '해설'], [13, '독서'], [14, '합계'], [15, '요일'], [16, '행사']
+  ].forEach(([ci, label]) => {
+    const c = ws.getRow(2).getCell(ci);
+    c.value = label; c.font = fHdrSm; c.fill = bgGray; c.alignment = aC;
+    setBorder(c,'thin','thin','thin','thin');
+  });
+
+  // ── 주차 블록 ──
+  // 열 인덱스: A=1,B=2,C=3,D=4,E=5,F=6,G=7,H=8,I=9
+  // A=일06, B=일11, C=월10, D=화10, E=수06, F=목10, G=금10, H=토10, I=토18
+
+  const BASE_ROW = 3;
+  const BLOCK = 12;
+
+  weeks.forEach((wk, wi) => {
+    const br = BASE_ROW + wi * BLOCK; // 블록 시작 행 (1-indexed)
+    for (let ri = 0; ri < BLOCK; ri++) ws.getRow(br+ri).height = ri===0 ? 13 : 12;
+
+    // 날짜 병합
+    ws.mergeCells(`A${br}:B${br}`);
+    ws.mergeCells(`H${br}:I${br}`);
+
+    // 열→(요일index, 시간) 매핑
+    const colMap = [
+      [1,0,'06:00'],[2,0,'11:00'],[3,1,'10:00'],[4,2,'10:00'],
+      [5,3,'06:00'],[6,4,'10:00'],[7,5,'10:00'],[8,6,'10:00'],[9,6,'18:00']
+    ];
+
+    // +0 날짜행
+    [[1,0],[3,1],[4,2],[5,3],[6,4],[7,5],[8,6]].forEach(([ci, di]) => {
+      const d = wk[di]; const c = ws.getRow(br).getCell(ci);
+      if (d) {
+        const notes = ['06:00','10:00','11:00','18:00','19:30']
+          .map(t => getNote(d,t)).filter(Boolean);
+        const extra = notes.length ? `(${notes[0]})` : '';
+        c.value = `${d}${extra}`;
+      }
+      c.font = fBold; c.fill = bgGray; c.alignment = aC;
+      setBorder(c,'thin','thin','thin','thin');
+    });
+
+    // +1 시간행
+    colMap.forEach(([ci, di, tstr]) => {
+      const d = wk[di]; const c = ws.getRow(br+1).getCell(ci);
+      if (d) { c.value = tstr; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin','thin',null);
+    });
+
+    // +2 해설 레이블
+    [[1,0],[2,0],[3,1],[4,2],[5,3],[6,4],[7,5],[9,6]].forEach(([ci,di]) => {
+      const d = wk[di]; const c = ws.getRow(br+2).getCell(ci);
+      if (d) { c.value = '해설'; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+
+    // +3 해설자
+    colMap.forEach(([ci, di, tstr]) => {
+      if (ci === 8) return; // 토10은 +6에서 처리
+      const d = wk[di]; const c = ws.getRow(br+3).getCell(ci);
+      if (d) { c.value = getSlot(d, tstr, 'haesul'); c.font = fNorm; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+
+    // +4 독서 레이블(화/수/목/금), 토 특이사항
+    [4,5,6,7].forEach(ci => {
+      const di = ci-2; // 화=2,수=3,목=4,금=5
+      const d = wk[di]; const c = ws.getRow(br+4).getCell(ci);
+      if (d) { c.value = '독  서'; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+    { // 토10 특이사항
+      const d = wk[6]; const c = ws.getRow(br+4).getCell(8);
+      if (d) { const n=getNote(d,'10:00'); c.value = n?`(${n})`:''; c.font=fBold; c.alignment=aC; }
+      setBorder(c,'thin','thin',null,null);
+    }
+
+    // +5 1독서자(화/수/목/금), 토10:00 시간
+    [4,5,6,7].forEach(ci => {
+      const di = ci-2; const d = wk[di]; const c = ws.getRow(br+5).getCell(ci);
+      if (d) { c.value = getSlot(d,'10:00','dok1'); c.font = fNorm; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+5).getCell(8);
+      if(d){c.value='10:00';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +6 월 1독서자, 토 해설 레이블
+    { const d=wk[1]; const c=ws.getRow(br+6).getCell(3);
+      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+6).getCell(8);
+      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +7 저녁 시간(화19:30,목19:30), 수 특이사항, 토 해설자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+7).getCell(ci);
+      if(d){c.value=tstr;c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[3]; const c=ws.getRow(br+7).getCell(5);
+      if(d){const n=getNote(d,'10:00');c.value=n||'';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+7).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +8 저녁 해설 레이블(화/목), 토10 독서, 토18 1독서 레이블
+    [[4,2],[6,4]].forEach(([ci,di]) => {
+      const d=wk[di]; const c=ws.getRow(br+8).getCell(ci);
+      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+8).getCell(8);
+      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+8).getCell(9);
+      if(d){c.value='1독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +9 저녁 해설자(화/목), 토10 독서1자, 토18 1독서자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+9).getCell(ci);
+      if(d){c.value=getSlot(d,tstr,'haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+9).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+9).getCell(9);
+      if(d){c.value=getSlot(d,'18:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +10 저녁 독서 레이블(화/목), 토10 독서2자, 토18 2독서 레이블
+    [[4,2],[6,4]].forEach(([ci,di]) => {
+      const d=wk[di]; const c=ws.getRow(br+10).getCell(ci);
+      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+10).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','dok2');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+10).getCell(9);
+      if(d){c.value='2독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +11 저녁 독서자(화/목), 토18 2독서자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+11).getCell(ci);
+      if(d){c.value=getSlot(d,tstr,'dok1');c.font=fNorm;c.alignment=aC;}
+      setBorder(c,'thin','thin',null,'thin');
+    });
+    { const d=wk[6]; const c=ws.getRow(br+11).getCell(9);
+      if(d){c.value=getSlot(d,'18:00','dok2');c.font=fNorm;c.alignment=aC;}
+      setBorder(c,'thin','thin',null,'thin'); }
+  });
+
+  // ── 봉사자 명단 (해설/독서/합계 집계) ──
+  members.forEach((name, i) => {
+    const ri = BASE_ROW + i;
+    const row = ws.getRow(ri);
+
+    // 해설/독서 횟수 집계
+    let cntHaesul = 0, cntDok = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const slots = scheduleData[ds] || getDefaultSlots(ds);
+      slots.forEach(s => {
+        if (s.haesul === name) cntHaesul++;
+        if (s.dok1   === name) cntDok++;
+        if (s.dok2   === name) cntDok++;
+      });
+    }
+
+    // 번호
+    const cJ = row.getCell(10);
+    cJ.value = i+1; cJ.font = fNorm; cJ.alignment = aC;
+    setBorder(cJ,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 이름
+    const cK = row.getCell(11);
+    cK.value = name; cK.font = {...fNorm, bold:true}; cK.alignment = aL;
+    setBorder(cK,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 해설 횟수
+    const cL = row.getCell(12);
+    cL.value = cntHaesul > 0 ? cntHaesul : ''; cL.font = fNorm; cL.alignment = aC;
+    if (cntHaesul > 0) cL.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8F4E8'} };
+    setBorder(cL,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 독서 횟수
+    const cM = row.getCell(13);
+    cM.value = cntDok > 0 ? cntDok : ''; cM.font = fNorm; cM.alignment = aC;
+    if (cntDok > 0) cM.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8EEF8'} };
+    setBorder(cM,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 합계
+    const cN = row.getCell(14);
+    const total = cntHaesul + cntDok;
+    cN.value = total > 0 ? total : ''; cN.font = {...fNorm, bold: total>0};
+    cN.alignment = aC;
+    if (total > 0) cN.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF3CC'} };
+    setBorder(cN,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+  });
+
+  // 합계 행 (봉사자 명단 마지막 다음 줄)
+  const sumRow = BASE_ROW + members.length;
+  const sr = ws.getRow(sumRow);
+  ws.mergeCells(`J${sumRow}:K${sumRow}`);
+  const cSum = sr.getCell(10);
+  cSum.value = '합  계'; cSum.font = {...fNorm, bold:true}; cSum.alignment = aC;
+  cSum.fill = bgGray; setBorder(cSum,'thin','thin','thin','thin');
+
+  let totalHaesul = 0, totalDok = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const slots = scheduleData[ds] || getDefaultSlots(ds);
+    slots.forEach(s => {
+      if (s.haesul) totalHaesul++;
+      if (s.dok1)   totalDok++;
+      if (s.dok2)   totalDok++;
+    });
+  }
+  [[12, totalHaesul, 'FFD4EDD4'], [13, totalDok, 'FFD4E0F5'], [14, totalHaesul+totalDok, 'FFFFE599']].forEach(([ci, val, argb]) => {
+    const c = sr.getCell(ci);
+    c.value = val; c.font = {...fNorm, bold:true}; c.alignment = aC;
+    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb} };
+    setBorder(c,'thin','thin','thin','thin');
+  });
+
+  // ── 안내 문구 ──
+  const lastRow = BASE_ROW + weeks.length * BLOCK + 1;
+  ws.getRow(lastRow  ).getCell(1).value = '* 독서자는 미사시작 15분 전까지 입당하여 독서대에 올라가 읽어 봅니다.';
+  ws.getRow(lastRow  ).getCell(1).font  = fNote;
+  ws.getRow(lastRow+1).getCell(1).value = '* 시간표 변동 시 각자 연락을 취해 주시기 바라며, 되도록이면 하루 전에 미리 연락바랍니다.';
+  ws.getRow(lastRow+1).getCell(1).font  = fNote;
+
+  // ── 저장 ──
+  const buf = await wb.xlsx.writeBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
+  const fname = `전례단_${year}${String(month).padStart(2,'0')}.xlsx`;
+  const a = document.createElement('a');
+  a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 </script>
 <footer class="church-footer">
