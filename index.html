@@ -267,22 +267,40 @@
   }
   .church-footer a { color: var(--gold); text-decoration: none; }
   .church-footer a:hover { text-decoration: underline; }
-  /* print */
+  /* print — 한 페이지(A4 가로)에 맞춤 */
+  @page { size: A4 landscape; margin: 8mm 8mm 6mm 8mm; }
   @media print {
-    body { background:white; }
-    header, aside { display:none; }
-    .container { display:block; }
-    main { padding:0; }
-    .schedule-wrapper { box-shadow:none; border-radius:0; }
-    .table-header-bar { background:white; }
-    .table-title { color:black; }
+    html, body { background:white; width:100%; height:auto; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    header, aside, #saveToast, .modal-overlay { display:none !important; }
+    .container { display:block; min-height:auto; }
+    main { padding:0; overflow:visible; }
+    .schedule-wrapper { box-shadow:none; border-radius:0; min-width:0; width:100%; overflow:visible; page-break-inside:avoid; break-inside:avoid; }
+
+    .table-header-bar { background:white; padding:4px 6px; border-bottom:2px solid #000; }
+    .table-title { color:black; font-size:14px; letter-spacing:2px; }
     .table-title span { color:var(--red); }
-    thead th { background:white; color:black; border:1px solid #aaa; }
-    .slot-block { background:white!important; color:black!important; border:1px solid #aaa; }
-    .slot-block .slot-time { color:var(--red)!important; }
-    .church-footer { display:none; }
+
+    table { page-break-inside:avoid; break-inside:avoid; }
+    thead th { background:white; color:black; border:1px solid #555; padding:3px 2px; font-size:11px; }
+    tr, td { page-break-inside:avoid; break-inside:avoid; }
+
+    td.date-cell { min-height:0; height:auto; padding:2px 2px; border:1px solid #777; }
+    td.date-cell.sunday, td.date-cell.saturday, td.date-cell.empty, td.date-cell.today {
+      background:white !important; outline:none;
+    }
+    .date-num { font-size:10px; margin-bottom:1px; }
+
+    .cell-slots { gap:1px; }
+    .slot-block { background:white !important; color:black !important; border:1px solid #888; padding:1px 2px; font-size:7.5px; line-height:1.25; border-radius:2px; }
+    .slot-block .slot-time { color:var(--red) !important; font-size:7.5px; }
+
     .feast-day { display:none; }
     .holiday-tag { display:none; }
+    .special-label { font-size:9px; padding:0 3px; background:white !important; color:#000 !important; border:1px solid #888; }
+
+    .footnote { font-size:8px; padding:4px 6px; line-height:1.4; }
+    .church-footer { display:none; }
   }
   .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
   .feast-day { font-size:10px; color:var(--red); font-weight:700; line-height:1.4; margin:2px 0 0; word-break:keep-all; text-align:left; padding:0 2px; }
