@@ -492,7 +492,11 @@
       <button class="avail-tab" id="tabOff"   onclick="setMode('off')">❌ 안되는 날</button>
       <button class="avail-tab" id="tabClear" onclick="setMode('clear')">🔄 지정 취소</button>
     </div>
-    <button onclick="clearAllAvail()" style="width:100%;margin-bottom:12px;padding:8px;background:#f0f0f0;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;color:#555;cursor:pointer;font-family:inherit;" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f0f0f0'">🗑️ 전체 지정 취소</button>
+    <button onclick="clearAllAvail()" style="width:100%;margin-bottom:6px;padding:8px;background:#f0f0f0;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;color:#555;cursor:pointer;font-family:inherit;" onmouseover="this.style.background='#e0e0e0'" onmouseout="this.style.background='#f0f0f0'">🗑️ 전체 지정 취소</button>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button onclick="setAllAvail('ok')"  style="flex:1;padding:8px;background:#d4f0e2;border:1px solid #1a7a4a;border-radius:8px;font-size:12px;font-weight:700;color:#1a7a4a;cursor:pointer;font-family:inherit;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">✅ 전체 가능</button>
+      <button onclick="setAllAvail('off')" style="flex:1;padding:8px;background:#fde8e8;border:1px solid #c0392b;border-radius:8px;font-size:12px;font-weight:700;color:#c0392b;cursor:pointer;font-family:inherit;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">❌ 전체 불가</button>
+    </div>
 
     <div class="avail-cal" id="availCal"></div>
 
@@ -1119,6 +1123,17 @@ function clearAllAvail() {
     setTimeout(() => { btn.textContent = orig; btn.style.background = '#f0f0f0'; }, 1200);
   }
 }
+function setAllAvail(mode) {
+  if (!availMember) return;
+  if (!availability[availMember]) availability[availMember] = {};
+  const daysInMonth = new Date(year, month, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    availability[availMember][ds] = mode;
+  }
+  renderAvailCal();
+  saveData();
+}
 function updateModeTabs() {
   ['ok','off','clear'].forEach(m => {
     const el = document.getElementById('tab' + m.charAt(0).toUpperCase() + m.slice(1));
@@ -1154,7 +1169,8 @@ function renderAvailCal() {
     const b = document.createElement('div'); b.className='avail-day blank'; cal.appendChild(b);
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    const state = av[d];
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const state = av[ds] !== undefined ? av[ds] : av[d]; // 구형 숫자키 호환
     const div = document.createElement('div');
     div.className = 'avail-day' + (state==='ok'?' d-ok':state==='off'?' d-off':'');
     div.textContent = d;
@@ -1164,13 +1180,17 @@ function renderAvailCal() {
 }
 function clickAvailDay(day) {
   if (!availability[availMember]) availability[availMember] = {};
-  const cur = availability[availMember][day];
+  const ds = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  const cur = availability[availMember][ds] !== undefined ? availability[availMember][ds] : availability[availMember][day];
   if (availMode === 'clear') {
+    delete availability[availMember][ds];
     delete availability[availMember][day];
   } else if (cur === availMode) {
-    delete availability[availMember][day]; // 같은 모드 재클릭 → 취소
+    delete availability[availMember][ds];
+    delete availability[availMember][day];
   } else {
-    availability[availMember][day] = availMode;
+    availability[availMember][ds] = availMode;
+    delete availability[availMember][day]; // 구형 숫자키 제거
   }
   renderAvailCal();
 }
