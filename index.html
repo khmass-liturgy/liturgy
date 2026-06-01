@@ -267,10 +267,9 @@
   }
   .church-footer a { color: var(--gold); text-decoration: none; }
   .church-footer a:hover { text-decoration: underline; }
-  /* print — A4 가로 한 장 맞춤 */
-  @page { size: A4 landscape; margin: 4mm; }
+  /* print — A4 세로 한 장 맞춤 */
+  @page { size: A4 portrait; margin: 6mm 5mm; }
   @media print {
-    html { zoom: 70%; }
     html, body { background: white; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     header, aside, #saveToast, .modal-overlay { display: none !important; }
@@ -282,46 +281,48 @@
     }
 
     /* 제목바 */
-    .table-header-bar { background: white; padding: 4px 8px; border-bottom: 2px solid #333; }
-    .table-title { color: black; font-size: 19px; letter-spacing: 2px; }
+    .table-header-bar { background: white; padding: 4px 6px; border-bottom: 2px solid #333; }
+    .table-title { color: black; font-size: 13px; letter-spacing: 1px; }
     .table-title span { color: var(--red); }
 
     /* 요일 헤더 */
     thead th {
       background: white; color: black;
-      border: 1px solid #555; padding: 3px 2px; font-size: 13px;
+      border: 1px solid #555; padding: 3px 1px; font-size: 10px;
     }
 
     /* 날짜 셀 */
     td.date-cell {
       min-height: 0 !important; height: auto;
       padding: 2px 2px; border: 1px solid #777;
+      vertical-align: top;
     }
     td.date-cell.sunday, td.date-cell.saturday,
     td.date-cell.empty, td.date-cell.today {
       background: white !important; outline: none;
     }
-    .date-num { font-size: 13px; margin-bottom: 0; }
+    .date-num { font-size: 11px; margin-bottom: 1px; }
 
-    /* 슬롯 블록 — 최대한 압축 */
+    /* 슬롯 블록 — 좁은 칸에 맞게 압축 */
     .cell-slots { gap: 1px; }
     .slot-block {
       background: white !important; color: black !important;
       border: 1px solid #999; padding: 1px 2px;
-      font-size: 10px; line-height: 1.2; border-radius: 2px;
+      font-size: 8px; line-height: 1.2; border-radius: 2px;
+      word-break: keep-all;
     }
-    .slot-block .slot-time { color: var(--red) !important; font-size: 10px; }
+    .slot-block .slot-time { color: var(--red) !important; font-size: 8px; font-weight: 700; }
 
     /* 기타 태그 */
     .feast-day   { display: none; }
     .holiday-tag { display: none; }
     .special-label {
-      font-size: 12px; padding: 0 2px;
+      font-size: 9px; padding: 0 2px;
       background: white !important; color: #000 !important; border: 1px solid #999;
     }
 
     /* 각주 & 푸터 */
-    .footnote { font-size: 11px; padding: 3px 8px; line-height: 1.3; border-top: 1px solid #ccc; }
+    .footnote { font-size: 9px; padding: 4px 6px; line-height: 1.4; border-top: 1px solid #ccc; }
     .church-footer { display: none; }
   }
   .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
