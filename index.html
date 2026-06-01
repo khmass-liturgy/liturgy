@@ -400,7 +400,7 @@
         📥 파일에서 불러오기
         <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
       </label>
-      <button class="btn btn-outline" onclick="clearStorage()" style="margin-top:4px;color:var(--red);border-color:var(--red)">🗑️ 저장 데이터 초기화</button>
+      <button class="btn btn-outline" onclick="clearStorage()" style="margin-top:4px;color:var(--red);border-color:var(--red)">🗑️ 배정 데이터 초기화</button>
     </div>
 
     <div>
@@ -889,11 +889,11 @@ function importData(event) {
   event.target.value = '';
 }
 function clearStorage() {
-  if (!confirm('저장된 봉사자 명단, 역할, 가능일, 전례표 데이터를 모두 초기화할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
-  localStorage.removeItem('liturgySchedule_members');
-  members = []; memberRoles = {}; availability = {}; timeOff = {}; timeOn = {}; scheduleData = {};
+  if (!confirm('가능일/불가일 설정과 전례표 배정 데이터를 초기화할까요?\n(봉사자 명단과 역할은 유지됩니다)')) return;
+  availability = {}; timeOff = {}; timeOn = {}; scheduleData = {};
+  saveData();
   renderMemberList(); renderCalendar();
-  alert('초기화 완료');
+  alert('초기화 완료 (봉사자 명단은 유지됨)');
 }
 
 // INIT
