@@ -363,8 +363,20 @@
     margin-top: 10px; padding-top: 8px;
     border-top: 1px dashed #d4bc7d;
     font-size: 11px; color: #8b6914;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    flex-wrap: wrap;
   }
   .pope-prayer-source a { color: #8b6914; text-decoration: underline; }
+  .pope-prayer-refresh {
+    margin-left: auto;
+    background: transparent; border: 1px solid #d4bc7d; border-radius: 6px;
+    cursor: pointer; padding: 3px 8px; font-size: 13px;
+    transition: background 0.15s;
+  }
+  .pope-prayer-refresh:hover { background: #f5e7c4; }
+  .pope-prayer-refresh.is-loading { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  #popePrayerStatus { font-size: 10px; color: #a08530; }
   .feast-day { font-size:10px; color:var(--red); font-weight:700; line-height:1.4; margin:2px 0 0; word-break:keep-all; text-align:left; padding:0 2px; }
   .holiday-tag { font-size:10px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:2px 0 0; display:inline-block; word-break:keep-all; }
   .special-label { font-size:16px; font-weight:700; border-radius:3px; padding:1px 5px; margin:1px 1px 1px 0; display:inline-block; word-break:keep-all; background:#e8eeff; color:#2240c4; }
@@ -542,11 +554,16 @@
         <span class="pope-prayer-icon">🕊️</span>
         <span class="pope-prayer-label">교황님의 기도지향</span>
         <span class="pope-prayer-month" id="popePrayerMonth"></span>
+        <button class="pope-prayer-refresh" id="popePrayerRefresh"
+                onclick="refreshPopePrayerFromCBCK()" title="cbck.or.kr에서 최신 내용 다시 불러오기">
+          🔄
+        </button>
       </div>
       <div class="pope-prayer-title" id="popePrayerTitle"></div>
       <div class="pope-prayer-body" id="popePrayerBody"></div>
       <div class="pope-prayer-source">
-        출처: <a href="https://cbck.or.kr/Pope/Prayer" target="_blank">한국천주교주교회의 — 교황님의 기도지향</a>
+        <span id="popePrayerStatus"></span>
+        <a href="https://cbck.or.kr/Pope/Prayer" target="_blank">원문 보기 ↗</a>
       </div>
     </div>
   </main>
@@ -1445,20 +1462,166 @@ const POPE_PRAYER_INTENTIONS = {
   }
 };
 
-function updatePopePrayer(y, m) {
-  const monthEl = document.getElementById('popePrayerMonth');
-  const titleEl = document.getElementById('popePrayerTitle');
-  const bodyEl  = document.getElementById('popePrayerBody');
-  if (!monthEl || !titleEl || !bodyEl) return;
+// 현재 표시된 (year, month) — 새로고침 버튼에서 참조
+let currentPopeYM = { y: null, m: null };
 
+function setPopePrayerStatus(text) {
+  const el = document.getElementById('popePrayerStatus');
+  if (el) el.textContent = text || '';
+}
+
+function displayPopePrayer(title, body, source) {
+  document.getElementById('popePrayerTitle').textContent = title || '';
+  document.getElementById('popePrayerBody').textContent  = body  || '';
+  setPopePrayerStatus(source ? `출처: ${source}` : '');
+}
+
+function readPopeCache(y, m) {
+  try {
+    const raw = localStorage.getItem(`cbck_pope_${y}_${m}`);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.t) return null;
+    // 30일 캐시
+    if (Date.now() - obj.t > 30 * 24 * 3600 * 1000) return null;
+    return obj;
+  } catch (e) { return null; }
+}
+
+function writePopeCache(y, m, title, body) {
+  try {
+    localStorage.setItem(`cbck_pope_${y}_${m}`,
+      JSON.stringify({ title, body, t: Date.now() }));
+  } catch (e) {}
+}
+
+async function fetchCBCKPopePrayer(year, month) {
+  const url = 'https://cbck.or.kr/Pope/Prayer';
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+
+  for (const proxyFn of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 7000);
+      const resp = await fetch(proxyFn(url), { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) continue;
+      const html = await resp.text();
+      if (!html || html.length < 200) continue;
+      const parsed = parseCBCKHTML(html, year, month);
+      if (parsed) return parsed;
+    } catch (e) {
+      // 다음 프록시로 진행
+    }
+  }
+  return null;
+}
+
+function parseCBCKHTML(html, year, month) {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const labels = [
+      `${year}년 ${month}월`,
+      `${year}년 ${String(month).padStart(2,'0')}월`,
+      `${year}.${month}`,
+      `${year}-${String(month).padStart(2,'0')}`,
+    ];
+    // 짧은 텍스트 노드에서 월 라벨 찾기
+    const cands = doc.querySelectorAll('h1, h2, h3, h4, h5, h6, dt, .title, .subject, strong, b, td, th, a');
+    for (const el of cands) {
+      const text = (el.textContent || '').trim();
+      if (text.length === 0 || text.length > 60) continue;
+      if (!labels.some(L => text.includes(L))) continue;
+      const found = extractIntentionNear(el);
+      if (found) return found;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function extractIntentionNear(monthEl) {
+  // 형제 노드에서 의미있는 텍스트 모으기
+  const texts = [];
+  let cur = monthEl.nextElementSibling;
+  let count = 0;
+  while (cur && count < 6 && texts.length < 2) {
+    const t = (cur.textContent || '').trim().replace(/\s+/g, ' ');
+    if (t.length >= 6 && t.length < 800) texts.push(t);
+    cur = cur.nextElementSibling;
+    count++;
+  }
+  // 부모 컨테이너 안에서도 다음 항목 시도
+  if (texts.length < 2 && monthEl.parentElement) {
+    const sibs = Array.from(monthEl.parentElement.children);
+    const idx = sibs.indexOf(monthEl);
+    for (let i = idx + 1; i < Math.min(idx + 6, sibs.length) && texts.length < 2; i++) {
+      const t = (sibs[i].textContent || '').trim().replace(/\s+/g, ' ');
+      if (t.length >= 6 && t.length < 800 && !texts.includes(t)) texts.push(t);
+    }
+  }
+  if (texts.length === 0) return null;
+  if (texts.length === 1) return { title: '', body: texts[0] };
+  return { title: texts[0], body: texts[1] };
+}
+
+async function updatePopePrayer(y, m) {
+  currentPopeYM = { y, m };
+  const monthEl = document.getElementById('popePrayerMonth');
+  if (!monthEl) return;
   monthEl.textContent = `${y}년 ${m}월`;
-  const data = POPE_PRAYER_INTENTIONS[y] && POPE_PRAYER_INTENTIONS[y][m];
-  if (data) {
-    titleEl.textContent = data.title;
-    bodyEl.textContent  = data.body;
+
+  // 1) 캐시 확인 — 있으면 즉시 표시 후 종료
+  const cached = readPopeCache(y, m);
+  if (cached && cached.title) {
+    displayPopePrayer(cached.title, cached.body, 'cbck.or.kr (캐시됨)');
+    return;
+  }
+
+  // 2) 내장 데이터로 우선 표시
+  const stored = POPE_PRAYER_INTENTIONS[y] && POPE_PRAYER_INTENTIONS[y][m];
+  if (stored) {
+    displayPopePrayer(stored.title, stored.body, '내장 데이터');
   } else {
-    titleEl.textContent = '기도지향 정보가 등록되지 않은 달입니다';
-    bodyEl.innerHTML = '한국천주교주교회의 <a href="https://cbck.or.kr/Pope/Prayer" target="_blank">교황님의 기도지향</a> 페이지에서 확인해 주세요.';
+    displayPopePrayer('', '내장 데이터가 없습니다. cbck.or.kr 원문을 확인해 주세요.', '');
+  }
+
+  // 3) 백그라운드로 cbck.or.kr 시도
+  try {
+    const fetched = await fetchCBCKPopePrayer(y, m);
+    // 사용자가 그새 다른 달로 이동했으면 갱신 안 함
+    if (currentPopeYM.y !== y || currentPopeYM.m !== m) return;
+    if (fetched && (fetched.title || fetched.body)) {
+      displayPopePrayer(fetched.title, fetched.body, 'cbck.or.kr');
+      writePopeCache(y, m, fetched.title, fetched.body);
+    }
+  } catch (e) {
+    /* 조용히 폴백 유지 */
+  }
+}
+
+async function refreshPopePrayerFromCBCK() {
+  const { y, m } = currentPopeYM;
+  if (!y || !m) return;
+  // 캐시 무효화
+  try { localStorage.removeItem(`cbck_pope_${y}_${m}`); } catch (e) {}
+  const btn = document.getElementById('popePrayerRefresh');
+  if (btn) btn.classList.add('is-loading');
+  setPopePrayerStatus('cbck.or.kr 불러오는 중…');
+  try {
+    const fetched = await fetchCBCKPopePrayer(y, m);
+    if (fetched && (fetched.title || fetched.body)) {
+      displayPopePrayer(fetched.title, fetched.body, 'cbck.or.kr');
+      writePopeCache(y, m, fetched.title, fetched.body);
+    } else {
+      const stored = POPE_PRAYER_INTENTIONS[y] && POPE_PRAYER_INTENTIONS[y][m];
+      if (stored) displayPopePrayer(stored.title, stored.body, '내장 데이터 (cbck.or.kr 접속 실패)');
+      setPopePrayerStatus('cbck.or.kr 접속 실패 — 내장 데이터 표시');
+    }
+  } finally {
+    if (btn) btn.classList.remove('is-loading');
   }
 }
 
@@ -2051,10 +2214,4 @@ async function exportExcel() {
   <div>
     <a href="https://sd.uca.or.kr/kyoha/" target="_blank">Sancta Familia Parochia 교하성당</a>
   </div>
-  <div>경기도 파주시 책향기숲길 62 &nbsp;|&nbsp; Tel. 031)948-9064~5 &nbsp;|&nbsp; Fax. 031)948-9067</div>
-  <div>대표자 : 도현우 안토니오</div>
-  <div>Copyright 2019. Kyoha Cathedral. All rights reserved.</div>
-</footer>
-
-</body>
-</html>
+  <div>경기도 파주시 책향기숲길 62 &nbsp;|&nbsp; Tel. 031)948-9064~5 &nbsp;|&nbsp; Fax. 031)948-9067</di
