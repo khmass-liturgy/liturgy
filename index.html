@@ -326,6 +326,7 @@
     .footnote { font-size: 9px; padding: 2px 6px; line-height: 1.3; border-top: 1px solid #ccc; }
     .church-footer { display: none; }
     .pope-prayer { display: none !important; }
+    .parish-updates { display: none !important; }
   }
   .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
 
@@ -377,6 +378,65 @@
   .pope-prayer-refresh.is-loading { animation: spin 1s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #popePrayerStatus { font-size: 10px; color: #a08530; }
+
+  /* 교하성당 공지사항·주보안내 */
+  .parish-updates {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 700px) {
+    .parish-updates { grid-template-columns: 1fr; }
+  }
+  .parish-section {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .parish-section-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+  }
+  .parish-icon { font-size: 16px; }
+  .parish-title {
+    font-size: 15px; font-weight: 700; color: #2a2a2a;
+    letter-spacing: -0.3px;
+  }
+  .parish-more {
+    margin-left: auto;
+    font-size: 11px; color: #888; text-decoration: none;
+    padding: 2px 8px; border: 1px solid #ddd; border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .parish-more:hover { color: var(--red); border-color: var(--red); }
+  .parish-list { list-style: none; margin: 0; padding: 0; }
+  .parish-list li {
+    padding: 7px 0; border-bottom: 1px dashed #f0f0f0;
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 13px; line-height: 1.4;
+  }
+  .parish-list li:last-child { border-bottom: none; }
+  .parish-list a {
+    color: #3a3a3a; text-decoration: none; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .parish-list a:hover { color: var(--red); text-decoration: underline; }
+  .parish-date {
+    font-size: 11px; color: #999; white-space: nowrap;
+    font-family: 'Courier New', monospace;
+  }
+  .parish-empty {
+    color: #999; font-size: 12px; padding: 12px 0; text-align: center;
+  }
+  .parish-section-footer {
+    margin-top: 10px; padding-top: 6px;
+    border-top: 1px dashed #eee;
+    font-size: 10px; color: #999; text-align: right;
+  }
   .feast-day { font-size:10px; color:var(--red); font-weight:700; line-height:1.4; margin:2px 0 0; word-break:keep-all; text-align:left; padding:0 2px; }
   .holiday-tag { font-size:10px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:2px 0 0; display:inline-block; word-break:keep-all; }
   .special-label { font-size:16px; font-weight:700; border-radius:3px; padding:1px 5px; margin:1px 1px 1px 0; display:inline-block; word-break:keep-all; background:#e8eeff; color:#2240c4; }
@@ -564,6 +624,31 @@
       <div class="pope-prayer-source">
         <span id="popePrayerStatus"></span>
         <a href="https://cbck.or.kr/Pope/Prayer" target="_blank">원문 보기 ↗</a>
+      </div>
+    </div>
+
+    <!-- 교하성당 공지사항·주보안내 -->
+    <div class="parish-updates" id="parishUpdates">
+      <div class="parish-section">
+        <div class="parish-section-header">
+          <span class="parish-icon">📢</span>
+          <span class="parish-title">공지사항</span>
+          <a href="https://sd.uca.or.kr/kyoha/board.aspx?mnucd=20001877"
+             target="_blank" class="parish-more">더보기 ↗</a>
+        </div>
+        <ul class="parish-list" id="kyohaNotices"></ul>
+        <div class="parish-section-footer" id="kyohaNoticesStatus"></div>
+      </div>
+
+      <div class="parish-section">
+        <div class="parish-section-header">
+          <span class="parish-icon">📋</span>
+          <span class="parish-title">주보안내</span>
+          <a href="https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570"
+             target="_blank" class="parish-more">더보기 ↗</a>
+        </div>
+        <ul class="parish-list" id="kyohaBulletins"></ul>
+        <div class="parish-section-footer" id="kyohaBulletinsStatus"></div>
       </div>
     </div>
   </main>
@@ -1625,6 +1710,180 @@ async function refreshPopePrayerFromCBCK() {
   }
 }
 
+// ── 교하성당 공지사항·주보안내 ──
+const KYOHA_FALLBACK = {
+  notices: [
+    { title: "‘1본당 1난민가정 동행 사업’ 동행 활동가 양성 교육", date: "2026-05-10",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37071" },
+    { title: "청소년 주일 행사, 연극 관람 갑니다~", date: "2026-05-10",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37070" },
+    { title: "민족화해부 <평화마중길> 도보 순례", date: "2026-05-03",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=36884" },
+    { title: "5월 성모성월 묵주기도", date: "2026-04-26",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=36714" },
+    { title: "부활맞이 대청소", date: "2026-03-14",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=35474" },
+  ],
+  bulletins: [
+    { title: "지극히 거룩하신 삼위일체 대축일", date: "2026-05-31",
+      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
+    { title: "성령 강림 대축일", date: "2026-05-24",
+      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
+    { title: "주님 승천 대축일 / 홍보 주일", date: "2026-05-17",
+      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
+    { title: "부활 제6주일", date: "2026-05-10",
+      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
+  ]
+};
+
+function renderParishList(elId, items, statusId, source) {
+  const ul = document.getElementById(elId);
+  const st = document.getElementById(statusId);
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!items || items.length === 0) {
+    ul.innerHTML = '<li class="parish-empty">표시할 항목이 없습니다</li>';
+  } else {
+    items.slice(0, 5).forEach(it => {
+      const li = document.createElement('li');
+      const a  = document.createElement('a');
+      a.href = it.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = it.title;
+      a.title = it.title;
+      const date = document.createElement('span');
+      date.className = 'parish-date';
+      date.textContent = it.date;
+      li.appendChild(a);
+      li.appendChild(date);
+      ul.appendChild(li);
+    });
+  }
+  if (st) st.textContent = source ? `출처: ${source}` : '';
+}
+
+function readKyohaCache() {
+  try {
+    const raw = localStorage.getItem('kyoha_updates');
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.t) return null;
+    // 6시간 캐시
+    if (Date.now() - obj.t > 6 * 3600 * 1000) return null;
+    return obj;
+  } catch (e) { return null; }
+}
+
+function writeKyohaCache(notices, bulletins) {
+  try {
+    localStorage.setItem('kyoha_updates', JSON.stringify({
+      notices, bulletins, t: Date.now()
+    }));
+  } catch (e) {}
+}
+
+async function fetchKyohaUpdates() {
+  const url = 'https://sd.uca.or.kr/kyoha/';
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+  for (const proxyFn of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(proxyFn(url), { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) continue;
+      const html = await resp.text();
+      if (!html || html.length < 500) continue;
+      const parsed = parseKyohaHTML(html);
+      if (parsed && (parsed.notices.length || parsed.bulletins.length)) return parsed;
+    } catch (e) { /* next proxy */ }
+  }
+  return null;
+}
+
+function parseKyohaHTML(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const base = 'https://sd.uca.or.kr/kyoha/';
+  const notices = [];
+  const bulletins = [];
+  const seen = new Set();
+
+  doc.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    let text = (a.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+    if (!dateMatch) return;
+    const date  = dateMatch[1];
+    const title = text.replace(dateMatch[0], '').trim();
+    if (!title || title.length < 2) return;
+
+    // 절대 URL 생성
+    let url;
+    if (/^https?:/i.test(href)) url = href;
+    else if (href.startsWith('/')) url = 'https://sd.uca.or.kr' + href;
+    else url = base + href;
+
+    const key = title + '|' + date;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    // 공지사항 vs 주보 구분
+    if (href.includes('board_view.aspx') || href.includes('mnucd=20001877')) {
+      notices.push({ title, date, url });
+    } else if (href.includes('jubo')) {
+      bulletins.push({ title, date, url });
+    }
+  });
+
+  // 날짜 내림차순 정렬
+  const byDate = (a, b) => b.date.localeCompare(a.date);
+  return {
+    notices: notices.sort(byDate).slice(0, 5),
+    bulletins: bulletins.sort(byDate).slice(0, 5)
+  };
+}
+
+async function loadKyohaUpdates() {
+  // 1) 캐시 확인 — 있으면 즉시 표시
+  const cached = readKyohaCache();
+  if (cached) {
+    renderParishList('kyohaNotices',   cached.notices,   'kyohaNoticesStatus',   'sd.uca.or.kr (캐시됨)');
+    renderParishList('kyohaBulletins', cached.bulletins, 'kyohaBulletinsStatus', 'sd.uca.or.kr (캐시됨)');
+    return;
+  }
+  // 2) 내장 데이터로 우선 표시
+  renderParishList('kyohaNotices',   KYOHA_FALLBACK.notices,   'kyohaNoticesStatus',   '내장 데이터');
+  renderParishList('kyohaBulletins', KYOHA_FALLBACK.bulletins, 'kyohaBulletinsStatus', '내장 데이터');
+  // 3) 백그라운드로 sd.uca.or.kr 시도
+  try {
+    const fresh = await fetchKyohaUpdates();
+    if (fresh) {
+      if (fresh.notices.length) {
+        renderParishList('kyohaNotices', fresh.notices, 'kyohaNoticesStatus', 'sd.uca.or.kr');
+      }
+      if (fresh.bulletins.length) {
+        renderParishList('kyohaBulletins', fresh.bulletins, 'kyohaBulletinsStatus', 'sd.uca.or.kr');
+      }
+      writeKyohaCache(
+        fresh.notices.length ? fresh.notices : KYOHA_FALLBACK.notices,
+        fresh.bulletins.length ? fresh.bulletins : KYOHA_FALLBACK.bulletins
+      );
+    }
+  } catch (e) { /* 폴백 유지 */ }
+}
+
+// 페이지 로드 시 1회 실행
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(loadKyohaUpdates, 300);
+  });
+}
+
 // ── CALENDAR ──
 function renderCalendar() {
   year  = parseInt(document.getElementById('yearInput').value);
@@ -2016,202 +2275,4 @@ async function exportExcel() {
 
     // +1 시간행
     colMap.forEach(([ci, di, tstr]) => {
-      const d = wk[di]; const c = ws.getRow(br+1).getCell(ci);
-      if (d) { c.value = tstr; c.font = fBold; c.alignment = aC; }
-      setBorder(c,'thin','thin','thin',null);
-    });
-
-    // +2 해설 레이블
-    [[1,0],[2,0],[3,1],[4,2],[5,3],[6,4],[7,5],[9,6]].forEach(([ci,di]) => {
-      const d = wk[di]; const c = ws.getRow(br+2).getCell(ci);
-      if (d) { c.value = '해설'; c.font = fBold; c.alignment = aC; }
-      setBorder(c,'thin','thin',null,null);
-    });
-
-    // +3 해설자
-    colMap.forEach(([ci, di, tstr]) => {
-      if (ci === 8) return; // 토10은 +6에서 처리
-      const d = wk[di]; const c = ws.getRow(br+3).getCell(ci);
-      if (d) { c.value = getSlot(d, tstr, 'haesul'); c.font = fNorm; c.alignment = aC; }
-      setBorder(c,'thin','thin',null,null);
-    });
-
-    // +4 독서 레이블(화/수/목/금), 토 특이사항
-    [4,5,6,7].forEach(ci => {
-      const di = ci-2; // 화=2,수=3,목=4,금=5
-      const d = wk[di]; const c = ws.getRow(br+4).getCell(ci);
-      if (d) { c.value = '독  서'; c.font = fBold; c.alignment = aC; }
-      setBorder(c,'thin','thin',null,null);
-    });
-    { // 토10 특이사항
-      const d = wk[6]; const c = ws.getRow(br+4).getCell(8);
-      if (d) { const n=getNote(d,'10:00'); c.value = n?`(${n})`:''; c.font=fBold; c.alignment=aC; }
-      setBorder(c,'thin','thin',null,null);
-    }
-
-    // +5 1독서자(화/수/목/금), 토10:00 시간
-    [4,5,6,7].forEach(ci => {
-      const di = ci-2; const d = wk[di]; const c = ws.getRow(br+5).getCell(ci);
-      if (d) { c.value = getSlot(d,'10:00','dok1'); c.font = fNorm; c.alignment = aC; }
-      setBorder(c,'thin','thin',null,null);
-    });
-    { const d=wk[6]; const c=ws.getRow(br+5).getCell(8);
-      if(d){c.value='10:00';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +6 월 1독서자, 토 해설 레이블
-    { const d=wk[1]; const c=ws.getRow(br+6).getCell(3);
-      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-    { const d=wk[6]; const c=ws.getRow(br+6).getCell(8);
-      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +7 저녁 시간(화19:30,목19:30), 수 특이사항, 토 해설자
-    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
-      const d=wk[di]; const c=ws.getRow(br+7).getCell(ci);
-      if(d){c.value=tstr;c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
-    });
-    { const d=wk[3]; const c=ws.getRow(br+7).getCell(5);
-      if(d){const n=getNote(d,'10:00');c.value=n||'';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-    { const d=wk[6]; const c=ws.getRow(br+7).getCell(8);
-      if(d){c.value=getSlot(d,'10:00','haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +8 저녁 해설 레이블(화/목), 토10 독서, 토18 1독서 레이블
-    [[4,2],[6,4]].forEach(([ci,di]) => {
-      const d=wk[di]; const c=ws.getRow(br+8).getCell(ci);
-      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
-    });
-    { const d=wk[6]; const c=ws.getRow(br+8).getCell(8);
-      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-    { const d=wk[6]; const c=ws.getRow(br+8).getCell(9);
-      if(d){c.value='1독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +9 저녁 해설자(화/목), 토10 독서1자, 토18 1독서자
-    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
-      const d=wk[di]; const c=ws.getRow(br+9).getCell(ci);
-      if(d){c.value=getSlot(d,tstr,'haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
-    });
-    { const d=wk[6]; const c=ws.getRow(br+9).getCell(8);
-      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-    { const d=wk[6]; const c=ws.getRow(br+9).getCell(9);
-      if(d){c.value=getSlot(d,'18:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +10 저녁 독서 레이블(화/목), 토10 독서2자, 토18 2독서 레이블
-    [[4,2],[6,4]].forEach(([ci,di]) => {
-      const d=wk[di]; const c=ws.getRow(br+10).getCell(ci);
-      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
-    });
-    { const d=wk[6]; const c=ws.getRow(br+10).getCell(8);
-      if(d){c.value=getSlot(d,'10:00','dok2');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-    { const d=wk[6]; const c=ws.getRow(br+10).getCell(9);
-      if(d){c.value='2독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
-
-    // +11 저녁 독서자(화/목), 토18 2독서자
-    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
-      const d=wk[di]; const c=ws.getRow(br+11).getCell(ci);
-      if(d){c.value=getSlot(d,tstr,'dok1');c.font=fNorm;c.alignment=aC;}
-      setBorder(c,'thin','thin',null,'thin');
-    });
-    { const d=wk[6]; const c=ws.getRow(br+11).getCell(9);
-      if(d){c.value=getSlot(d,'18:00','dok2');c.font=fNorm;c.alignment=aC;}
-      setBorder(c,'thin','thin',null,'thin'); }
-  });
-
-  // ── 봉사자 명단 (해설/독서/합계 집계) ──
-  members.forEach((name, i) => {
-    const ri = BASE_ROW + i;
-    const row = ws.getRow(ri);
-
-    // 해설/독서 횟수 집계
-    let cntHaesul = 0, cntDok = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const slots = scheduleData[ds] || getDefaultSlots(ds);
-      slots.forEach(s => {
-        if (s.haesul === name) cntHaesul++;
-        if (s.dok1   === name) cntDok++;
-        if (s.dok2   === name) cntDok++;
-      });
-    }
-
-    // 번호
-    const cJ = row.getCell(10);
-    cJ.value = i+1; cJ.font = fNorm; cJ.alignment = aC;
-    setBorder(cJ,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
-
-    // 이름
-    const cK = row.getCell(11);
-    cK.value = name; cK.font = {...fNorm, bold:true}; cK.alignment = aL;
-    setBorder(cK,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
-
-    // 해설 횟수
-    const cL = row.getCell(12);
-    cL.value = cntHaesul > 0 ? cntHaesul : ''; cL.font = fNorm; cL.alignment = aC;
-    if (cntHaesul > 0) cL.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8F4E8'} };
-    setBorder(cL,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
-
-    // 독서 횟수
-    const cM = row.getCell(13);
-    cM.value = cntDok > 0 ? cntDok : ''; cM.font = fNorm; cM.alignment = aC;
-    if (cntDok > 0) cM.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8EEF8'} };
-    setBorder(cM,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
-
-    // 합계
-    const cN = row.getCell(14);
-    const total = cntHaesul + cntDok;
-    cN.value = total > 0 ? total : ''; cN.font = {...fNorm, bold: total>0};
-    cN.alignment = aC;
-    if (total > 0) cN.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF3CC'} };
-    setBorder(cN,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
-  });
-
-  // 합계 행 (봉사자 명단 마지막 다음 줄)
-  const sumRow = BASE_ROW + members.length;
-  const sr = ws.getRow(sumRow);
-  ws.mergeCells(`J${sumRow}:K${sumRow}`);
-  const cSum = sr.getCell(10);
-  cSum.value = '합  계'; cSum.font = {...fNorm, bold:true}; cSum.alignment = aC;
-  cSum.fill = bgGray; setBorder(cSum,'thin','thin','thin','thin');
-
-  let totalHaesul = 0, totalDok = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const slots = scheduleData[ds] || getDefaultSlots(ds);
-    slots.forEach(s => {
-      if (s.haesul) totalHaesul++;
-      if (s.dok1)   totalDok++;
-      if (s.dok2)   totalDok++;
-    });
-  }
-  [[12, totalHaesul, 'FFD4EDD4'], [13, totalDok, 'FFD4E0F5'], [14, totalHaesul+totalDok, 'FFFFE599']].forEach(([ci, val, argb]) => {
-    const c = sr.getCell(ci);
-    c.value = val; c.font = {...fNorm, bold:true}; c.alignment = aC;
-    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb} };
-    setBorder(c,'thin','thin','thin','thin');
-  });
-
-  // ── 안내 문구 ──
-  const lastRow = BASE_ROW + weeks.length * BLOCK + 1;
-  ws.getRow(lastRow  ).getCell(1).value = '* 독서자는 미사시작 15분 전까지 입당하여 독서대에 올라가 읽어 봅니다.';
-  ws.getRow(lastRow  ).getCell(1).font  = fNote;
-  ws.getRow(lastRow+1).getCell(1).value = '* 시간표 변동 시 각자 연락을 취해 주시기 바라며, 되도록이면 하루 전에 미리 연락바랍니다.';
-  ws.getRow(lastRow+1).getCell(1).font  = fNote;
-
-  // ── 저장 ──
-  const buf = await wb.xlsx.writeBuffer();
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  const b64 = btoa(binary);
-  const fname = `전례단_${year}${String(month).padStart(2,'0')}.xlsx`;
-  const a = document.createElement('a');
-  a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
-  a.download = fname;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-</script>
-<footer class="church-footer">
-  <div>
-    <a href="https://sd.uca.or.kr/kyoha/" target="_blank">Sancta Familia Parochia 교하성당</a>
-  </div>
-  <div>경기도 파주시 책향기숲길 62 &nbsp;|&nbsp; Tel. 031)948-9064~5 &nbsp;|&nbsp; Fax. 031)948-9067</di
+      const d = wk[di]; const c = ws.getRow(br+1).getCell(c
