@@ -2278,4 +2278,209 @@ async function exportExcel() {
     });
 
     // +1 시간행
-   
+    colMap.forEach(([ci, di, tstr]) => {
+      const d = wk[di]; const c = ws.getRow(br+1).getCell(ci);
+      if (d) { c.value = tstr; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin','thin',null);
+    });
+
+    // +2 해설 레이블
+    [[1,0],[2,0],[3,1],[4,2],[5,3],[6,4],[7,5],[9,6]].forEach(([ci,di]) => {
+      const d = wk[di]; const c = ws.getRow(br+2).getCell(ci);
+      if (d) { c.value = '해설'; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+
+    // +3 해설자
+    colMap.forEach(([ci, di, tstr]) => {
+      if (ci === 8) return; // 토10은 +6에서 처리
+      const d = wk[di]; const c = ws.getRow(br+3).getCell(ci);
+      if (d) { c.value = getSlot(d, tstr, 'haesul'); c.font = fNorm; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+
+    // +4 독서 레이블(화/수/목/금), 토 특이사항
+    [4,5,6,7].forEach(ci => {
+      const di = ci-2; // 화=2,수=3,목=4,금=5
+      const d = wk[di]; const c = ws.getRow(br+4).getCell(ci);
+      if (d) { c.value = '독  서'; c.font = fBold; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+    { // 토10 특이사항
+      const d = wk[6]; const c = ws.getRow(br+4).getCell(8);
+      if (d) { const n=getNote(d,'10:00'); c.value = n?`(${n})`:''; c.font=fBold; c.alignment=aC; }
+      setBorder(c,'thin','thin',null,null);
+    }
+
+    // +5 1독서자(화/수/목/금), 토10:00 시간
+    [4,5,6,7].forEach(ci => {
+      const di = ci-2; const d = wk[di]; const c = ws.getRow(br+5).getCell(ci);
+      if (d) { c.value = getSlot(d,'10:00','dok1'); c.font = fNorm; c.alignment = aC; }
+      setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+5).getCell(8);
+      if(d){c.value='10:00';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +6 월 1독서자, 토 해설 레이블
+    { const d=wk[1]; const c=ws.getRow(br+6).getCell(3);
+      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+6).getCell(8);
+      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +7 저녁 시간(화19:30,목19:30), 수 특이사항, 토 해설자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+7).getCell(ci);
+      if(d){c.value=tstr;c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[3]; const c=ws.getRow(br+7).getCell(5);
+      if(d){const n=getNote(d,'10:00');c.value=n||'';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+7).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +8 저녁 해설 레이블(화/목), 토10 독서, 토18 1독서 레이블
+    [[4,2],[6,4]].forEach(([ci,di]) => {
+      const d=wk[di]; const c=ws.getRow(br+8).getCell(ci);
+      if(d){c.value='해설';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+8).getCell(8);
+      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+8).getCell(9);
+      if(d){c.value='1독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +9 저녁 해설자(화/목), 토10 독서1자, 토18 1독서자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+9).getCell(ci);
+      if(d){c.value=getSlot(d,tstr,'haesul');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+9).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+9).getCell(9);
+      if(d){c.value=getSlot(d,'18:00','dok1');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +10 저녁 독서 레이블(화/목), 토10 독서2자, 토18 2독서 레이블
+    [[4,2],[6,4]].forEach(([ci,di]) => {
+      const d=wk[di]; const c=ws.getRow(br+10).getCell(ci);
+      if(d){c.value='독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null);
+    });
+    { const d=wk[6]; const c=ws.getRow(br+10).getCell(8);
+      if(d){c.value=getSlot(d,'10:00','dok2');c.font=fNorm;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+    { const d=wk[6]; const c=ws.getRow(br+10).getCell(9);
+      if(d){c.value='2독  서';c.font=fBold;c.alignment=aC;} setBorder(c,'thin','thin',null,null); }
+
+    // +11 저녁 독서자(화/목), 토18 2독서자
+    [[4,2,'19:30'],[6,4,'19:30']].forEach(([ci,di,tstr]) => {
+      const d=wk[di]; const c=ws.getRow(br+11).getCell(ci);
+      if(d){c.value=getSlot(d,tstr,'dok1');c.font=fNorm;c.alignment=aC;}
+      setBorder(c,'thin','thin',null,'thin');
+    });
+    { const d=wk[6]; const c=ws.getRow(br+11).getCell(9);
+      if(d){c.value=getSlot(d,'18:00','dok2');c.font=fNorm;c.alignment=aC;}
+      setBorder(c,'thin','thin',null,'thin'); }
+  });
+
+  // ── 봉사자 명단 (해설/독서/합계 집계) ──
+  members.forEach((name, i) => {
+    const ri = BASE_ROW + i;
+    const row = ws.getRow(ri);
+
+    // 해설/독서 횟수 집계
+    let cntHaesul = 0, cntDok = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const slots = scheduleData[ds] || getDefaultSlots(ds);
+      slots.forEach(s => {
+        if (s.haesul === name) cntHaesul++;
+        if (s.dok1   === name) cntDok++;
+        if (s.dok2   === name) cntDok++;
+      });
+    }
+
+    // 번호
+    const cJ = row.getCell(10);
+    cJ.value = i+1; cJ.font = fNorm; cJ.alignment = aC;
+    setBorder(cJ,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 이름
+    const cK = row.getCell(11);
+    cK.value = name; cK.font = {...fNorm, bold:true}; cK.alignment = aL;
+    setBorder(cK,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 해설 횟수
+    const cL = row.getCell(12);
+    cL.value = cntHaesul > 0 ? cntHaesul : ''; cL.font = fNorm; cL.alignment = aC;
+    if (cntHaesul > 0) cL.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8F4E8'} };
+    setBorder(cL,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 독서 횟수
+    const cM = row.getCell(13);
+    cM.value = cntDok > 0 ? cntDok : ''; cM.font = fNorm; cM.alignment = aC;
+    if (cntDok > 0) cM.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8EEF8'} };
+    setBorder(cM,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+
+    // 합계
+    const cN = row.getCell(14);
+    const total = cntHaesul + cntDok;
+    cN.value = total > 0 ? total : ''; cN.font = {...fNorm, bold: total>0};
+    cN.alignment = aC;
+    if (total > 0) cN.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF3CC'} };
+    setBorder(cN,'thin','thin',i===0?'thin':null, i===members.length-1?'thin':null);
+  });
+
+  // 합계 행 (봉사자 명단 마지막 다음 줄)
+  const sumRow = BASE_ROW + members.length;
+  const sr = ws.getRow(sumRow);
+  ws.mergeCells(`J${sumRow}:K${sumRow}`);
+  const cSum = sr.getCell(10);
+  cSum.value = '합  계'; cSum.font = {...fNorm, bold:true}; cSum.alignment = aC;
+  cSum.fill = bgGray; setBorder(cSum,'thin','thin','thin','thin');
+
+  let totalHaesul = 0, totalDok = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const slots = scheduleData[ds] || getDefaultSlots(ds);
+    slots.forEach(s => {
+      if (s.haesul) totalHaesul++;
+      if (s.dok1)   totalDok++;
+      if (s.dok2)   totalDok++;
+    });
+  }
+  [[12, totalHaesul, 'FFD4EDD4'], [13, totalDok, 'FFD4E0F5'], [14, totalHaesul+totalDok, 'FFFFE599']].forEach(([ci, val, argb]) => {
+    const c = sr.getCell(ci);
+    c.value = val; c.font = {...fNorm, bold:true}; c.alignment = aC;
+    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb} };
+    setBorder(c,'thin','thin','thin','thin');
+  });
+
+  // ── 안내 문구 ──
+  const lastRow = BASE_ROW + weeks.length * BLOCK + 1;
+  ws.getRow(lastRow  ).getCell(1).value = '* 독서자는 미사시작 15분 전까지 입당하여 독서대에 올라가 읽어 봅니다.';
+  ws.getRow(lastRow  ).getCell(1).font  = fNote;
+  ws.getRow(lastRow+1).getCell(1).value = '* 시간표 변동 시 각자 연락을 취해 주시기 바라며, 되도록이면 하루 전에 미리 연락바랍니다.';
+  ws.getRow(lastRow+1).getCell(1).font  = fNote;
+
+  // ── 저장 ──
+  const buf = await wb.xlsx.writeBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
+  const fname = `전례단_${year}${String(month).padStart(2,'0')}.xlsx`;
+  const a = document.createElement('a');
+  a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+</script>
+<footer class="church-footer">
+  <div>
+    <a href="https://sd.uca.or.kr/kyoha/" target="_blank">Sancta Familia Parochia 교하성당</a>
+  </div>
+  <div>경기도 파주시 책향기숲길 62 &nbsp;|&nbsp; Tel. 031)948-9064~5 &nbsp;|&nbsp; Fax. 031)948-9067</div>
+  <div>대표자 : 도현우 안토니오</div>
+  <div>Copyright 2019. Kyoha Cathedral. All rights reserved.</div>
+</footer>
+
+</body>
+</html>
