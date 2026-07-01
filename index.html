@@ -2046,7 +2046,8 @@ function mkSelect(val, si, field, dayNum, dow, slotTime) {
     return true;
   });
   const opts = filtered.map(m => {
-    const av = (availability[m]||{})[dayNum];
+    const mav = availability[m] || {};
+    const av = mav[editingDate] !== undefined ? mav[editingDate] : mav[dayNum]; // 구형 숫자키 호환
     let icon = av==='ok' ? ' ✅' : av==='off' ? ' ❌' : '';
     // 시간대별 불가 체크
     if (!icon && slotTime !== undefined && dow !== undefined) {
@@ -2083,11 +2084,13 @@ function canAssign(name, day, time) {
     const mTN = (timeOn[name] || {})[dow] || [];
     if (mTN.length > 0 && !mTN.includes(time)) return false;
   }
-  // 날짜별 가능/불가 체크
+  // 날짜별 가능/불가 체크 (availability는 "YYYY-MM-DD" 풀 날짜 문자열 키로 저장됨)
+  const ds = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
   const av = availability[name] || {};
+  const state = av[ds] !== undefined ? av[ds] : av[day]; // 구형 숫자키 호환
   const hasOkDays = Object.values(av).some(v => v==='ok');
-  if (hasOkDays) return av[day] === 'ok';
-  return av[day] !== 'off';
+  if (hasOkDays) return state === 'ok';
+  return state !== 'off';
 }
 
 function autoAssign() {
