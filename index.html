@@ -552,6 +552,11 @@
         📥 파일에서 불러오기
         <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
       </label>
+      <button class="btn btn-outline" onclick="downloadExcelTemplate()" style="margin-top:4px">📄 불가일정 양식 다운로드</button>
+      <label class="btn btn-gold" style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:4px">
+        📗 불가일정 엑셀 업로드
+        <input type="file" id="importExcelFile" accept=".xlsx" onchange="importExcelAvailability(event)" style="display:none">
+      </label>
       <button class="btn btn-outline" onclick="clearStorage()" style="margin-top:4px;color:var(--red);border-color:var(--red)">🗑️ 배정 데이터 초기화</button>
     </div>
 
@@ -991,6 +996,8 @@ let availability = {};
 // timeOff[name][dow] = ['HH:MM', ...]  (dow: 0=일 ~ 6=토)
 let timeOff = {};
 let timeOn  = {};   // 시간대별 가능 설정: timeOn[name][dow] = ['HH:MM', ...]
+// dateTimeOff[name]["YYYY-MM-DD"] = ['HH:MM', ...]  (특정 날짜의 특정 시간만 불가)
+let dateTimeOff = {};
 let scheduleData  = {};
 let editingDate   = null;
 let availMember   = null;
@@ -1058,7 +1065,7 @@ const KYOHA_FALLBACK = {
 // ── 로컬스토리지 저장/불러오기 ──
 function saveData() {
   try {
-    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, scheduleData };
+    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, scheduleData };
     localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
     showSaveToast();
   } catch(e) { console.warn('저장 실패:', e); }
@@ -1073,6 +1080,7 @@ function loadData() {
     if (data.availability) availability = data.availability;
     if (data.timeOff)      timeOff      = data.timeOff;
     if (data.timeOn)       timeOn       = data.timeOn;
+    if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
     if (data.scheduleData) scheduleData = data.scheduleData;
     // 저장된 연월 복원 (구버전 데이터는 scheduleData 키에서 자동 감지)
     if (data.year && data.month) {
@@ -1093,7 +1101,7 @@ function showSaveToast() {
   t._timer = setTimeout(() => t.classList.remove('show'), 1800);
 }
 function exportData() {
-  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, scheduleData };
+  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, scheduleData };
   const json = JSON.stringify(data, null, 2);
   const d = new Date();
   const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
@@ -1121,6 +1129,7 @@ function importData(event) {
       if (data.availability) availability = data.availability;
       if (data.timeOff)      timeOff      = data.timeOff;
       if (data.timeOn)       timeOn       = data.timeOn;
+      if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
       if (data.scheduleData) scheduleData = data.scheduleData;
       // 연월 복원: 명시된 값 우선, 없으면 scheduleData 키에서 자동 감지 (구버전 호환)
       if (data.year && data.month) {
@@ -1143,9 +1152,161 @@ function importData(event) {
   reader.readAsText(file);
   event.target.value = '';
 }
+// ── 불가일정 엑셀 업로드 (전례단_불가일정_양식.xlsx) ──
+function importExcelAvailability(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (typeof ExcelJS === 'undefined') { alert('❌ ExcelJS 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.'); return; }
+
+  const EX_TIMES = ['06:00','09:00','10:00','11:00','18:00','19:30'];
+  const DOW_MAP = { '일요일':0,'월요일':1,'화요일':2,'수요일':3,'목요일':4,'금요일':5,'토요일':6,
+                    '일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6 };
+  const WEEK_MAP = { '첫째':1,'둘째':2,'셋째':3,'넷째':4,'다섯째':5 };
+
+  // 셀 값을 문자열로 정규화
+  function cellStr(cell) {
+    if (!cell || cell.value == null) return '';
+    const v = cell.value;
+    if (v instanceof Date) return v.toISOString().slice(0,10);
+    if (typeof v === 'object') {
+      if (v.richText) return v.richText.map(t=>t.text).join('').trim();
+      if (v.text) return String(v.text).trim();
+      if (v.result != null) return String(v.result).trim();
+      return '';
+    }
+    return String(v).trim();
+  }
+  // "06시" → "06:00" 등 시간 문자열 매핑 (null = 전체)
+  function mapTime(s) {
+    const t = s.replace(/\s/g,'');
+    if (!t || t === '전체') return null;
+    if (t.includes('19')) return '19:30';
+    if (t.includes('18')) return '18:00';
+    if (t.includes('11')) return '11:00';
+    if (t.includes('10')) return '10:00';
+    if (t.includes('09') || t.includes('9시')) return '09:00';
+    if (t.includes('06') || t.includes('6시')) return '06:00';
+    return null;
+  }
+  // 날짜 문자열 정규화 → "YYYY-MM-DD" 또는 null
+  function mapDate(s) {
+    const m = s.match(/(\d{4})[.\-\/년\s]+(\d{1,2})[.\-\/월\s]+(\d{1,2})/);
+    if (!m) return null;
+    return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  }
+  // 해당 연도에서 (N째, 요일)에 해당하는 날짜들 전개 → ["YYYY-MM-DD", ...]
+  function expandMonthly(y, week, dow) {
+    const out = [];
+    for (let mo = 1; mo <= 12; mo++) {
+      const dim = new Date(y, mo, 0).getDate();
+      for (let d = 1; d <= dim; d++) {
+        if (new Date(y, mo-1, d).getDay() === dow && Math.ceil(d/7) === week) {
+          out.push(`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+  function addDateOff(name, ds)        { if (!availability[name]) availability[name] = {}; availability[name][ds] = 'off'; }
+  function addDateTimeOff(name, ds, t) { if (!dateTimeOff[name]) dateTimeOff[name] = {};
+                                         if (!dateTimeOff[name][ds]) dateTimeOff[name][ds] = [];
+                                         if (!dateTimeOff[name][ds].includes(t)) dateTimeOff[name][ds].push(t); }
+  function addWeeklyOff(name, dow, t)  { if (!timeOff[name]) timeOff[name] = {};
+                                         if (!timeOff[name][dow]) timeOff[name][dow] = [];
+                                         if (!timeOff[name][dow].includes(t)) timeOff[name][dow].push(t); }
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(e.target.result);
+
+      let addedMembers = 0, roleUpdates = 0, ruleCount = 0, skipped = [];
+
+      // ── 1) 봉사자목록 시트 ──
+      const wsM = wb.getWorksheet('봉사자목록');
+      if (wsM) {
+        wsM.eachRow((row, rn) => {
+          if (rn < 4) return; // 제목/안내/헤더 행 건너뛰기
+          const name = cellStr(row.getCell(2));
+          if (!name) return;
+          const roleS = cellStr(row.getCell(3));
+          let role = null;
+          const hasH = roleS.includes('해설'), hasD = roleS.includes('독서');
+          if (hasH && hasD) role = 'both';
+          else if (hasH)    role = 'haesul';
+          else if (hasD)    role = 'dok';
+          if (!members.includes(name)) { members.push(name); addedMembers++; }
+          if (role && memberRoles[name] !== role) { memberRoles[name] = role; roleUpdates++; }
+        });
+      }
+
+      // ── 2) 불가일정 시트 ──
+      const wsA = wb.getWorksheet('불가일정');
+      if (!wsA) { alert('❌ "불가일정" 시트를 찾을 수 없습니다.\n전례단_불가일정_양식.xlsx 파일이 맞는지 확인하세요.'); return; }
+
+      wsA.eachRow((row, rn) => {
+        if (rn < 4) return;
+        const name   = cellStr(row.getCell(1));
+        if (!name) return;
+        const repeat = cellStr(row.getCell(2));
+        const dateS  = cellStr(row.getCell(3));
+        const dowS   = cellStr(row.getCell(4));
+        const timeS  = cellStr(row.getCell(5));
+        const time   = mapTime(timeS);
+
+        if (!members.includes(name)) { members.push(name); addedMembers++; }
+
+        if (repeat === '매주') {
+          const dow = DOW_MAP[dowS.replace(/\s/g,'')];
+          if (dow === undefined) { skipped.push(`${rn}행: 요일 인식 불가 (${dowS})`); return; }
+          const times = time ? [time] : EX_TIMES;
+          times.forEach(t => addWeeklyOff(name, dow, t));
+          ruleCount++;
+        } else if (repeat === '매월') {
+          // "첫째 일요일" 형식 파싱 (요일 칸 또는 비고 칸)
+          const src = (dowS + ' ' + cellStr(row.getCell(7))).replace(/\s+/g,' ');
+          const wm = src.match(/(첫째|둘째|셋째|넷째|다섯째)\s*(일|월|화|수|목|금|토)요일?/);
+          if (!wm) { skipped.push(`${rn}행: 매월 주차·요일 인식 불가 (${dowS})`); return; }
+          const week = WEEK_MAP[wm[1]], dow = DOW_MAP[wm[2]];
+          expandMonthly(year, week, dow).forEach(ds => {
+            if (time) addDateTimeOff(name, ds, time);
+            else      addDateOff(name, ds);
+          });
+          ruleCount++;
+        } else {
+          // 일회성 (기본값)
+          const ds = mapDate(dateS);
+          if (!ds) { skipped.push(`${rn}행: 날짜 인식 불가 (${dateS})`); return; }
+          if (time) addDateTimeOff(name, ds, time);
+          else      addDateOff(name, ds);
+          ruleCount++;
+        }
+      });
+
+      renderMemberList();
+      renderCalendar();
+      saveData();
+
+      let msg = `✅ 엑셀 불가일정을 불러왔습니다.\n\n• 불가 규칙: ${ruleCount}건 적용`;
+      if (addedMembers) msg += `\n• 신규 봉사자: ${addedMembers}명 추가`;
+      if (roleUpdates)  msg += `\n• 역할 갱신: ${roleUpdates}명`;
+      if (skipped.length) msg += `\n\n⚠️ 건너뛴 행 (${skipped.length}건):\n` + skipped.slice(0,5).join('\n') + (skipped.length > 5 ? '\n…' : '');
+      msg += '\n\n이제 [자동 배정 실행]을 누르면 불가일정을 반영해 배정합니다.';
+      alert(msg);
+    } catch(err) {
+      console.error(err);
+      alert('❌ 엑셀 파일을 읽을 수 없습니다.\n' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function clearStorage() {
   if (!confirm('가능일/불가일 설정과 전례표 배정 데이터를 초기화할까요?\n(봉사자 명단과 역할은 유지됩니다)')) return;
-  availability = {}; timeOff = {}; timeOn = {}; scheduleData = {};
+  availability = {}; timeOff = {}; timeOn = {}; dateTimeOff = {}; scheduleData = {};
   saveData();
   renderMemberList(); renderCalendar();
   alert('초기화 완료 (봉사자 명단은 유지됨)');
@@ -2054,6 +2215,11 @@ function mkSelect(val, si, field, dayNum, dow, slotTime) {
       const mTO = (timeOff[m] || {})[dow] || [];
       if (mTO.includes(slotTime)) icon = ' ⏰❌';
     }
+    // 특정 날짜+시간 불가 체크 (엑셀 업로드분)
+    if (!icon && slotTime !== undefined && editingDate) {
+      const mDTO = (dateTimeOff[m] || {})[editingDate] || [];
+      if (mDTO.includes(slotTime)) icon = ' ⏰❌';
+    }
     return `<option value="${m}" ${m===val?'selected':''}>${m}${icon}</option>`;
   }).join('');
   return `<select onchange="updSlot(${si},'${field}',this.value)"><option value="">-</option>${opts}</select>`;
@@ -2083,6 +2249,10 @@ function canAssign(name, day, time) {
     // 가능 시간 제한: 설정된 경우 해당 시간만 배정 가능
     const mTN = (timeOn[name] || {})[dow] || [];
     if (mTN.length > 0 && !mTN.includes(time)) return false;
+    // 특정 날짜+시간 불가 체크 (엑셀 업로드: 일회성 + 특정시간)
+    const dsT = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const mDTO = (dateTimeOff[name] || {})[dsT] || [];
+    if (mDTO.includes(time)) return false;
   }
   // 날짜별 가능/불가 체크 (availability는 "YYYY-MM-DD" 풀 날짜 문자열 키로 저장됨)
   const ds = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -2471,6 +2641,149 @@ async function exportExcel() {
   const a = document.createElement('a');
   a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
   a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── 불가일정 입력용 엑셀 양식 다운로드 (현재 봉사자 명단 자동 포함) ──
+async function downloadExcelTemplate() {
+  if (typeof ExcelJS === 'undefined') {
+    alert('엑셀 라이브러리를 불러오는 중입니다.\n잠시 후 다시 시도해주세요. (인터넷 연결 필요)');
+    return;
+  }
+  const wb = new ExcelJS.Workbook();
+
+  const NAVY='FF1A2744', GOLD='FFC8A84B', RED2='FFC0392B', GREEN2='FF1A7A4A',
+        LIGHT2='FFF5F3EE', YELLOW2='FFFFF9C4', BLUEL='FFE3F2FD', WHITE2='FFFFFFFF';
+  const thin = { style:'thin', color:{argb:'FFBBBBBB'} };
+  const bAll = { top:thin, left:thin, bottom:thin, right:thin };
+  const fill = c => ({ type:'pattern', pattern:'solid', fgColor:{argb:c} });
+  const ctr  = { horizontal:'center', vertical:'middle', wrapText:true };
+  const lft  = { horizontal:'left',   vertical:'middle', wrapText:true };
+
+  function titleRow(ws, text, span, bg, fg) {
+    ws.mergeCells(1, 1, 1, span);
+    const c = ws.getCell(1,1);
+    c.value = text;
+    c.font = { name:'맑은 고딕', size:14, bold:true, color:{argb:fg||WHITE2} };
+    c.fill = fill(bg); c.alignment = ctr;
+    ws.getRow(1).height = 30;
+  }
+  function noteRow(ws, text, span) {
+    ws.mergeCells(2, 1, 2, span);
+    const c = ws.getCell(2,1);
+    c.value = text;
+    c.font = { name:'맑은 고딕', size:9, italic:true, color:{argb:RED2} };
+    c.fill = fill(YELLOW2); c.alignment = lft;
+    ws.getRow(2).height = 24;
+  }
+  function headRow(ws, headers, widths, bg) {
+    headers.forEach((h, i) => {
+      const c = ws.getCell(3, i+1);
+      c.value = h;
+      c.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:WHITE2} };
+      c.fill = fill(bg||NAVY); c.alignment = ctr; c.border = bAll;
+      ws.getColumn(i+1).width = widths[i];
+    });
+    ws.getRow(3).height = 28;
+  }
+  function dataCell(ws, r, cIdx, val, isCenter, bg) {
+    const c = ws.getCell(r, cIdx);
+    c.value = val;
+    c.font = { name:'맑은 고딕', size:10 };
+    c.fill = fill(bg || (r % 2 === 0 ? LIGHT2 : WHITE2));
+    c.alignment = isCenter ? ctr : lft;
+    c.border = bAll;
+    return c;
+  }
+  const dvList = f => ({ type:'list', allowBlank:true, formulae:[`"${f}"`] });
+
+  // ── 시트1: 봉사자목록 (현재 명단 자동 입력) ──
+  const ws1 = wb.addWorksheet('봉사자목록');
+  titleRow(ws1, '전례단 봉사자 기본 정보', 5, NAVY);
+  noteRow(ws1, '※ 현재 프로그램에 등록된 명단입니다. 이름은 불가일정 시트와 동일하게 입력하세요.', 5);
+  headRow(ws1, ['번호','이름','역할','연락처','비고'], [8,14,18,18,24], GOLD);
+  const roleLabel = { haesul:'해설자', dok:'독서자', both:'해설자·독서자' };
+  members.forEach((name, i) => {
+    const r = i + 4;
+    dataCell(ws1, r, 1, i+1, true);
+    dataCell(ws1, r, 2, name, false);
+    dataCell(ws1, r, 3, roleLabel[memberRoles[name] || 'both'], true)
+      .dataValidation = dvList('해설자,독서자,해설자·독서자');
+    dataCell(ws1, r, 4, '', false);
+    dataCell(ws1, r, 5, '', false);
+  });
+  // 여분 빈 행 5개
+  for (let i = 0; i < 5; i++) {
+    const r = members.length + 4 + i;
+    for (let cIdx = 1; cIdx <= 5; cIdx++) dataCell(ws1, r, cIdx, '', cIdx===1||cIdx===3);
+    ws1.getCell(r,3).dataValidation = dvList('해설자,독서자,해설자·독서자');
+  }
+  ws1.views = [{ state:'frozen', ySplit:3 }];
+
+  // ── 시트2: 불가일정 ──
+  const ws2 = wb.addWorksheet('불가일정');
+  titleRow(ws2, '봉사자 불가 일정 입력', 7, RED2);
+  noteRow(ws2, '※ 날짜는 YYYY-MM-DD 형식, 미사시간·반복유형은 목록에서 선택하세요. 파란색 행은 예시입니다 (지우고 사용).', 7);
+  headRow(ws2, ['이름','반복유형','날짜\n(YYYY-MM-DD)','요일\n(매주/매월)','미사시간','사유','비고'], [14,13,17,14,14,18,16]);
+  const ex2 = [
+    ['홍길동','일회성','2026-07-15','','전체','개인 사정',''],
+    ['홍길동','매주','','수요일','10시','직장',''],
+    ['홍길동','매월','','첫째 일요일','06시','가족행사',''],
+  ];
+  for (let r = 4; r <= 63; r++) {
+    const row = ex2[r-4] || ['','','','','','',''];
+    const isEx = r - 4 < ex2.length;
+    row.forEach((v, i) => dataCell(ws2, r, i+1, v, [2,4,5].includes(i+1), isEx ? BLUEL : undefined));
+    ws2.getCell(r,2).dataValidation = dvList('일회성,매주,매월');
+    ws2.getCell(r,4).dataValidation = dvList('일요일,월요일,화요일,수요일,목요일,금요일,토요일,첫째 일요일,둘째 일요일,셋째 일요일,넷째 일요일');
+    ws2.getCell(r,5).dataValidation = dvList('전체,06시,09시,10시,11시,19시30분,18시(토)');
+  }
+  ws2.views = [{ state:'frozen', ySplit:3 }];
+
+  // ── 시트3: 사용설명서 ──
+  const ws3 = wb.addWorksheet('사용설명서');
+  ws3.getColumn(1).width = 26; ws3.getColumn(2).width = 62;
+  titleRow(ws3, '📋 사용 설명서', 2, NAVY);
+  const guide = [
+    ['▶ 입력 방법',''],
+    ['반복유형 = 일회성','특정 날짜 하루만 불가 → 날짜 칸에 YYYY-MM-DD 입력 (예: 2026-07-15)'],
+    ['반복유형 = 매주','매주 특정 요일 불가 → 요일 칸에서 요일 선택'],
+    ['반복유형 = 매월','매월 특정 주차 불가 → 요일 칸에서 "첫째 일요일" 형식 선택'],
+    ['미사시간 = 전체','해당 날/요일의 모든 미사 불가'],
+    ['미사시간 = 특정시간','그 시간대 미사만 불가'],
+    ['▶ 업로드 방법',''],
+    ['1단계','작성 후 저장'],
+    ['2단계','전례표 프로그램에서 [📗 불가일정 엑셀 업로드] 클릭'],
+    ['3단계','[자동 배정 실행] → 불가일정 반영된 전례표 완성'],
+    ['▶ 주의사항',''],
+    ['이름 통일','봉사자목록·불가일정 시트의 이름이 프로그램 명단과 정확히 일치해야 함'],
+    ['시트명 유지','시트 이름과 헤더(3행)를 수정하면 프로그램이 읽지 못함'],
+  ];
+  guide.forEach((g, i) => {
+    const r = i + 3;
+    const ca = ws3.getCell(r,1), cb = ws3.getCell(r,2);
+    ca.value = g[0]; cb.value = g[1];
+    if (g[0].startsWith('▶')) {
+      ca.font = { name:'맑은 고딕', size:11, bold:true, color:{argb:NAVY} };
+      ca.fill = fill(LIGHT2); cb.fill = fill(LIGHT2);
+    } else {
+      ca.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:GREEN2} };
+      cb.font = { name:'맑은 고딕', size:10 };
+    }
+    ca.alignment = lft; cb.alignment = lft;
+  });
+
+  // ── 저장 (base64 data URI — file:// 대응) ──
+  const buf = await wb.xlsx.writeBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
+  const a = document.createElement('a');
+  a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
+  a.download = '전례단_불가일정_양식.xlsx';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
