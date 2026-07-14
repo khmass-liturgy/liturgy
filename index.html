@@ -511,6 +511,8 @@
         </select>
         <button id="memberSaveBtn" onclick="addMember()">+</button>
       </div>
+      <button class="btn btn-outline" style="width:100%;margin-top:6px" onclick="syncRosterFromMeeting()">🔄 회의록 앱 명단 동기화</button>
+      <p id="rosterSyncStatus" style="font-size:11px;color:var(--gray);margin-top:4px"></p>
       <!-- 수정 모드 버튼 (이름 클릭 시 표시) -->
       <div id="memberEditBar" style="display:none;margin-top:6px;gap:5px;display:none;align-items:center">
         <button onclick="saveMemberEdit()" style="flex:1;padding:6px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✅ 저장</button>
@@ -1495,6 +1497,42 @@ function addMember() {
     renderMemberList();
     inp.value = '';
     saveData();
+  }
+}
+
+// ── 회의록 앱(단원관리) 명단 동기화 ──
+// 회의록 앱이 Firebase의 공개 노드(jeonrye/publicRoster)에 이름 목록을 게시함
+const MEETING_ROSTER_URL = 'https://khmass-jeonrye-default-rtdb.firebaseio.com/jeonrye/publicRoster.json';
+async function syncRosterFromMeeting() {
+  const st = document.getElementById('rosterSyncStatus');
+  st.textContent = '불러오는 중...';
+  try {
+    const res = await fetch(MEETING_ROSTER_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const names = data && Array.isArray(data.names) ? data.names.filter(n => n && n.trim()) : null;
+    if (!names || !names.length) throw new Error('회의록 앱에서 게시된 명단이 없습니다. 회의록 앱에 로그인해 한 번 저장해 주세요.');
+    // 새 이름 추가
+    let added = [];
+    names.forEach(n => {
+      if (!members.includes(n)) { members.push(n); memberRoles[n] = memberRoles[n] || 'dok'; added.push(n); }
+    });
+    // 마스터에 없는 이름 → 삭제 확인
+    const extra = members.filter(n => !names.includes(n));
+    let removed = 0;
+    if (extra.length && confirm('회의록 앱 명단에 없는 이름이 있습니다:\n' + extra.join(', ') + '\n\n시간표 명단에서 삭제할까요? (배정 기록은 유지)')) {
+      extra.forEach(n => {
+        members = members.filter(x => x !== n);
+        delete memberRoles[n]; delete availability[n]; delete timeOff[n]; delete timeOn[n]; delete dateTimeOff[n];
+      });
+      removed = extra.length;
+    }
+    renderMemberList(); saveData();
+    const when = data.updatedAt ? new Date(data.updatedAt).toLocaleDateString('ko-KR') : '';
+    st.textContent = `✅ 동기화 완료 — 전체 ${names.length}명, 추가 ${added.length}명${removed?`, 삭제 ${removed}명`:''}${when?` (명단 기준 ${when})`:''}`;
+    if (added.length) st.textContent += ' · 새 이름의 역할(해설/독서)은 이름을 클릭해 지정하세요';
+  } catch (e) {
+    st.textContent = '❌ ' + e.message;
   }
 }
 
