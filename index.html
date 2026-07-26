@@ -449,6 +449,24 @@
   .role-both    { background:#fef3c7; color:#92400e; }
   .role-none    { background:#eee; color:#999; }
 
+  /* ── 봉사 횟수 배지 ── */
+  .count-badge { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:700; white-space:nowrap; background:#eee; color:#666; }
+  .count-max   { background:#fde8e8; color:var(--red); }
+  .count-min   { background:#dbeafe; color:#1e40af; }
+
+  /* ── 최다/최소 배정 요약 패널 ── */
+  .assign-stats-box { background:var(--light); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:11px; }
+  .assign-stats-row  { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+  .assign-stats-row:last-of-type { margin-bottom:0; }
+  .assign-stats-label { font-weight:700; color:var(--navy); white-space:nowrap; }
+  .assign-stats-names { display:flex; gap:4px; flex-wrap:wrap; }
+  .stat-chip { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .stat-chip-max { background:var(--red); color:#fff; }
+  .stat-chip-min { background:#1e40af; color:#fff; }
+  .stat-chip:hover { opacity:0.8; }
+  .assign-stats-warn { border-color:var(--red); background:#fdf1f1; }
+  .assign-stats-note { font-size:10px; color:var(--red); margin-top:6px; font-weight:700; line-height:1.4; }
+
   /* ── 역할 선택 (모달 내) ── */
   .role-tabs { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:14px; }
   .role-tab  { flex:1; padding:8px 4px; text-align:center; cursor:pointer; font-size:12px; font-weight:700;
@@ -518,6 +536,7 @@
         <button onclick="saveMemberEdit()" style="flex:1;padding:6px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✅ 저장</button>
         <button onclick="cancelMemberEdit()" style="flex:1;padding:6px;background:var(--light);color:var(--navy);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">✕ 취소</button>
       </div>
+      <div id="assignStats" style="margin-top:8px"></div>
       <div class="member-list" id="memberList" style="margin-top:8px"></div>
     </div>
 
@@ -1000,6 +1019,8 @@ let timeOff = {};
 let timeOn  = {};   // 시간대별 가능 설정: timeOn[name][dow] = ['HH:MM', ...]
 // dateTimeOff[name]["YYYY-MM-DD"] = ['HH:MM', ...]  (특정 날짜의 특정 시간만 불가)
 let dateTimeOff = {};
+// avoidPairs = [['이름A','이름B'], ...]  같은 미사에 함께 배정하면 안 되는 조합
+let avoidPairs = [];
 let scheduleData  = {};
 let editingDate   = null;
 let availMember   = null;
@@ -1067,7 +1088,7 @@ const KYOHA_FALLBACK = {
 // ── 로컬스토리지 저장/불러오기 ──
 function saveData() {
   try {
-    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, scheduleData };
+    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, scheduleData };
     localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
     showSaveToast();
   } catch(e) { console.warn('저장 실패:', e); }
@@ -1083,6 +1104,7 @@ function loadData() {
     if (data.timeOff)      timeOff      = data.timeOff;
     if (data.timeOn)       timeOn       = data.timeOn;
     if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
+    if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
     if (data.scheduleData) scheduleData = data.scheduleData;
     // 저장된 연월 복원 (구버전 데이터는 scheduleData 키에서 자동 감지)
     if (data.year && data.month) {
@@ -1103,7 +1125,7 @@ function showSaveToast() {
   t._timer = setTimeout(() => t.classList.remove('show'), 1800);
 }
 function exportData() {
-  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, scheduleData };
+  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, scheduleData };
   const json = JSON.stringify(data, null, 2);
   const d = new Date();
   const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
@@ -1132,6 +1154,7 @@ function importData(event) {
       if (data.timeOff)      timeOff      = data.timeOff;
       if (data.timeOn)       timeOn       = data.timeOn;
       if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
+      if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
       if (data.scheduleData) scheduleData = data.scheduleData;
       // 연월 복원: 명시된 값 우선, 없으면 scheduleData 키에서 자동 감지 (구버전 호환)
       if (data.year && data.month) {
@@ -1288,15 +1311,34 @@ function importExcelAvailability(event) {
         }
       });
 
+      // ── 3) 함께불가 시트 (동시배정 제외 조합) ──
+      let pairCount = 0, pairSkipped = [];
+      const wsP = wb.getWorksheet('함께불가');
+      if (wsP) {
+        wsP.eachRow((row, rn) => {
+          if (rn < 4) return;
+          const nameA = cellStr(row.getCell(1));
+          const nameB = cellStr(row.getCell(2));
+          if (!nameA || !nameB) return;
+          if (nameA === nameB) { pairSkipped.push(`${rn}행: 같은 이름 입력 (${nameA})`); return; }
+          if (!members.includes(nameA)) { members.push(nameA); addedMembers++; }
+          if (!members.includes(nameB)) { members.push(nameB); addedMembers++; }
+          const exists = avoidPairs.some(([a,b]) => (a===nameA&&b===nameB) || (a===nameB&&b===nameA));
+          if (!exists) { avoidPairs.push([nameA, nameB]); pairCount++; }
+        });
+      }
+
       renderMemberList();
       renderCalendar();
       saveData();
 
       let msg = `✅ 엑셀 불가일정을 불러왔습니다.\n\n• 불가 규칙: ${ruleCount}건 적용`;
+      if (pairCount) msg += `\n• 동시배정 제외 조합: ${pairCount}건 추가`;
       if (addedMembers) msg += `\n• 신규 봉사자: ${addedMembers}명 추가`;
       if (roleUpdates)  msg += `\n• 역할 갱신: ${roleUpdates}명`;
-      if (skipped.length) msg += `\n\n⚠️ 건너뛴 행 (${skipped.length}건):\n` + skipped.slice(0,5).join('\n') + (skipped.length > 5 ? '\n…' : '');
-      msg += '\n\n이제 [자동 배정 실행]을 누르면 불가일정을 반영해 배정합니다.';
+      const allSkipped = skipped.concat(pairSkipped);
+      if (allSkipped.length) msg += `\n\n⚠️ 건너뛴 행 (${allSkipped.length}건):\n` + allSkipped.slice(0,5).join('\n') + (allSkipped.length > 5 ? '\n…' : '');
+      msg += '\n\n이제 [자동 배정 실행]을 누르면 불가일정과 조합 제외가 반영됩니다.';
       alert(msg);
     } catch(err) {
       console.error(err);
@@ -1308,7 +1350,7 @@ function importExcelAvailability(event) {
 
 function clearStorage() {
   if (!confirm('가능일/불가일 설정과 전례표 배정 데이터를 초기화할까요?\n(봉사자 명단과 역할은 유지됩니다)')) return;
-  availability = {}; timeOff = {}; timeOn = {}; dateTimeOff = {}; scheduleData = {};
+  availability = {}; timeOff = {}; timeOn = {}; dateTimeOff = {}; avoidPairs = []; scheduleData = {};
   saveData();
   renderMemberList(); renderCalendar();
   alert('초기화 완료 (봉사자 명단은 유지됨)');
@@ -1352,9 +1394,66 @@ function getAvailSummary(name) {
   return { label: label || '미지정', cls };
 }
 
+// 현재 연/월(scheduleData) 기준 봉사자별 배정 횟수 집계
+function getAssignCounts() {
+  const counts = {};
+  members.forEach(m => counts[m] = 0);
+  Object.values(scheduleData).forEach(slots => {
+    slots.forEach(s => {
+      [s.haesul, s.dok1, s.dok2].forEach(name => {
+        if (name && name !== '(미배정)' && counts.hasOwnProperty(name)) counts[name]++;
+      });
+    });
+  });
+  return counts;
+}
+// 배정이 1건 이상 있는 봉사자 중 최다·최소 인원 이름 목록 반환
+function getMinMaxAssignees() {
+  const counts = getAssignCounts();
+  const active = members.filter(m => counts[m] > 0);
+  if (!active.length) return { max:-1, min:-1, maxNames:[], minNames:[] };
+  const vals = active.map(m => counts[m]);
+  const max = Math.max(...vals), min = Math.min(...vals);
+  return {
+    max, min,
+    maxNames: active.filter(m => counts[m] === max),
+    minNames: active.filter(m => counts[m] === min),
+  };
+}
+
+// 최다/최소 배정 요약 패널 렌더링
+function renderAssignStats() {
+  const el = document.getElementById('assignStats');
+  if (!el) return;
+  const { max, min, maxNames, minNames } = getMinMaxAssignees();
+  if (max < 0) { el.innerHTML = ''; return; }
+
+  const gap = max - min;
+  const gapWarn = gap >= 3;
+
+  function nameChips(names, kind) {
+    return names.map(n => `<span class="stat-chip stat-chip-${kind}" onclick="openAvail('${n.replace(/'/g,"\\'")}')" title="클릭 → ${n} 가능일/역할 관리">${n}</span>`).join('');
+  }
+
+  el.innerHTML = `
+    <div class="assign-stats-box${gapWarn ? ' assign-stats-warn' : ''}">
+      <div class="assign-stats-row">
+        <span class="assign-stats-label">⬆ 최다 <b>${max}회</b></span>
+        <div class="assign-stats-names">${nameChips(maxNames, 'max')}</div>
+      </div>
+      <div class="assign-stats-row">
+        <span class="assign-stats-label">⬇ 최소 <b>${min}회</b></span>
+        <div class="assign-stats-names">${nameChips(minNames, 'min')}</div>
+      </div>
+      ${gapWarn ? `<div class="assign-stats-note">⚠️ 최다·최소 격차 ${gap}회 — 편중이 큽니다. 이름을 눌러 가능일을 조정해보세요.</div>` : ''}
+    </div>`;
+}
+
 function renderMemberList() {
   const el = document.getElementById('memberList');
   el.innerHTML = '';
+  const counts = getAssignCounts();
+  const { max, min, maxNames, minNames } = getMinMaxAssignees();
   members.forEach((m, i) => {
     const s = getAvailSummary(m);
     const r = getRoleInfo(m);
@@ -1370,6 +1469,18 @@ function renderMemberList() {
 
     const tagRight = document.createElement('div');
     tagRight.className = 'tag-right';
+
+    // 봉사 횟수 뱃지 (최다=빨강/⬆, 최소=파랑/⬇, 그 외=회색)
+    const cnt = counts[m] || 0;
+    if (cnt > 0) {
+      const isMax = max > min && maxNames.includes(m);
+      const isMin = max > min && minNames.includes(m);
+      const cntBadge = document.createElement('span');
+      cntBadge.className = 'count-badge' + (isMax ? ' count-max' : isMin ? ' count-min' : '');
+      cntBadge.title = isMax ? '이번 달 최다 배정' : isMin ? '이번 달 최소 배정' : '이번 달 배정 횟수';
+      cntBadge.textContent = (isMax ? '⬆' : isMin ? '⬇' : '') + `${cnt}회`;
+      tagRight.appendChild(cntBadge);
+    }
 
     const roleBadge = document.createElement('span');
     roleBadge.className = `role-badge ${r.cls}`;
@@ -1404,6 +1515,7 @@ function renderMemberList() {
     tag.appendChild(tagRight);
     el.appendChild(tag);
   });
+  renderAssignStats();
 }
 
 function startMemberEdit(name) {
@@ -1483,6 +1595,8 @@ function deleteMember(i) {
   delete memberRoles[name];
   delete timeOff[name];
   delete timeOn[name];
+  delete dateTimeOff[name];
+  avoidPairs = avoidPairs.filter(([a,b]) => a !== name && b !== name);
   renderMemberList();
   saveData();
 }
@@ -1524,6 +1638,7 @@ async function syncRosterFromMeeting() {
       extra.forEach(n => {
         members = members.filter(x => x !== n);
         delete memberRoles[n]; delete availability[n]; delete timeOff[n]; delete timeOn[n]; delete dateTimeOff[n];
+        avoidPairs = avoidPairs.filter(([a,b]) => a !== n && b !== n);
       });
       removed = extra.length;
     }
@@ -2149,6 +2264,7 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
   }
+  renderAssignStats();
 }
 
 function renderCellSlots(dateStr) {
@@ -2275,7 +2391,7 @@ function addModalSlot() {
   scheduleData[editingDate].push({time: defaultTime, haesul:'', dok1:'', dok2:'', note:''});
   renderModalSlots();
 }
-function saveAssign() { renderCellSlots(editingDate); closeAssign(); saveData(); }
+function saveAssign() { renderCellSlots(editingDate); closeAssign(); saveData(); renderMemberList(); }
 
 // ── AUTO ASSIGN ──
 function canAssign(name, day, time) {
@@ -2301,6 +2417,15 @@ function canAssign(name, day, time) {
   return state !== 'off';
 }
 
+// 조합충돌 체크: name을 used(이미 이 미사에 배정된 인원)에 추가했을 때 avoidPairs 위반 여부
+function hasConflict(name, used) {
+  return avoidPairs.some(([a, b]) => {
+    if (name === a) return used.includes(b);
+    if (name === b) return used.includes(a);
+    return false;
+  });
+}
+
 function autoAssign() {
   if (!members.length) { alert('봉사자를 등록해주세요.'); return; }
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -2316,12 +2441,18 @@ function autoAssign() {
   function pick(role, day, used, time) {
     const pool = (role==='haesul') ? haesulMembers : dokMembers;
     const ptr  = (role==='haesul') ? 'haesul' : role;
+    // 1순위: 가능일 + 조합충돌 없음
     for (let t = 0; t < pool.length; t++) {
       const m = pool[(ptrs[ptr]+t) % pool.length];
-      if (canAssign(m, day, time) && !used.includes(m)) {
+      if (canAssign(m, day, time) && !used.includes(m) && !hasConflict(m, used)) {
         ptrs[ptr] = (ptrs[ptr]+t+1) % pool.length;
         return m;
       }
+    }
+    // 2순위: 가능일이면 배정 (조합충돌 있어도 완전 미배정보다는 낫지만, 충돌 없는 쪽 우선 이미 위에서 시도함)
+    for (let t = 0; t < pool.length; t++) {
+      const m = pool[(ptrs[ptr]+t) % pool.length];
+      if (canAssign(m, day, time) && !used.includes(m)) { ptrs[ptr]=(ptrs[ptr]+t+1)%pool.length; return m; }
     }
     for (let t = 0; t < pool.length; t++) {
       const m = pool[(ptrs[ptr]+t) % pool.length];
@@ -2347,13 +2478,22 @@ function autoAssign() {
     renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
   }
   saveData();
-  alert('✅ 자동 배정 완료!\n가능일 / 불가일 설정이 반영되었습니다.');
+  renderMemberList();
+  const { max, min, maxNames, minNames } = getMinMaxAssignees();
+  let msg = '✅ 자동 배정 완료!\n가능일 / 불가일 설정이 반영되었습니다.';
+  if (max >= 0) {
+    msg += `\n\n⬆ 최다 배정: ${maxNames.join(', ')} (${max}회)`;
+    msg += `\n⬇ 최소 배정: ${minNames.join(', ')} (${min}회)`;
+    if (max - min >= 3) msg += `\n\n⚠️ 격차가 ${max-min}회로 큽니다. 좌측 목록에서 확인해보세요.`;
+  }
+  alert(msg);
 }
 
 function clearAll() {
   if (!confirm('모든 배정을 초기화할까요?')) return;
   scheduleData = {};
   renderCalendar();
+  renderMemberList();
   saveData();
 }
 
@@ -2780,7 +2920,25 @@ async function downloadExcelTemplate() {
   }
   ws2.views = [{ state:'frozen', ySplit:3 }];
 
-  // ── 시트3: 사용설명서 ──
+  // ── 시트3: 함께불가 (동시배정 제외 조합) ──
+  const ws3p = wb.addWorksheet('함께불가');
+  titleRow(ws3p, '함께 배정하면 안 되는 봉사자 조합', 4, GREEN2);
+  noteRow(ws3p, '※ 같은 미사(해설·1독서·2독서)에 함께 배정되면 안 되는 두 사람을 입력하세요. 순서는 상관없습니다.', 4);
+  headRow(ws3p, ['봉사자 A','봉사자 B','사유','비고'], [16,16,20,20]);
+  const nameList = members.length ? members.join(',') : '이름없음';
+  const ex3 = [
+    ['홍길동','김철수','서로 불편함',''],
+  ];
+  for (let r = 4; r <= 23; r++) {
+    const row = ex3[r-4] || ['','','',''];
+    const isEx = r - 4 < ex3.length;
+    row.forEach((v, i) => dataCell(ws3p, r, i+1, v, i<2, isEx ? BLUEL : undefined));
+    ws3p.getCell(r,1).dataValidation = dvList(nameList);
+    ws3p.getCell(r,2).dataValidation = dvList(nameList);
+  }
+  ws3p.views = [{ state:'frozen', ySplit:3 }];
+
+  // ── 시트4: 사용설명서 ──
   const ws3 = wb.addWorksheet('사용설명서');
   ws3.getColumn(1).width = 26; ws3.getColumn(2).width = 62;
   titleRow(ws3, '📋 사용 설명서', 2, NAVY);
@@ -2791,6 +2949,9 @@ async function downloadExcelTemplate() {
     ['반복유형 = 매월','매월 특정 주차 불가 → 요일 칸에서 "첫째 일요일" 형식 선택'],
     ['미사시간 = 전체','해당 날/요일의 모든 미사 불가'],
     ['미사시간 = 특정시간','그 시간대 미사만 불가'],
+    ['▶ 함께불가 시트',''],
+    ['용도','두 사람이 같은 미사(해설·1독서·2독서)에 동시에 배정되지 않도록 설정'],
+    ['입력','봉사자 A, B 칸에 이름 선택 (드롭다운 제공, 순서 무관)'],
     ['▶ 업로드 방법',''],
     ['1단계','작성 후 저장'],
     ['2단계','전례표 프로그램에서 [📗 불가일정 엑셀 업로드] 클릭'],
