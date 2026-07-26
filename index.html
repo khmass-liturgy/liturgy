@@ -1411,7 +1411,11 @@ function getAvailSummary(name) {
 function getAssignCounts() {
   const counts = {};
   members.forEach(m => counts[m] = 0);
-  Object.values(scheduleData).forEach(slots => {
+  // 현재 화면에 표시 중인 연·월 데이터만 집계 (다른 달 배정분은 제외)
+  const prefix = `${year}-${String(month).padStart(2,'0')}-`;
+  Object.entries(scheduleData).forEach(([dateStr, slots]) => {
+    if (!dateStr.startsWith(prefix)) return;
+    if (!Array.isArray(slots)) return;
     slots.forEach(s => {
       const names = [s.haesul, s.dok1, s.dok2, ...(s.extraDoks || [])];
       names.forEach(name => {
@@ -1465,6 +1469,7 @@ function renderAssignStats() {
 
 function renderMemberList() {
   const el = document.getElementById('memberList');
+  if (!el) return;
   el.innerHTML = '';
   const counts = getAssignCounts();
   const { max, min, maxNames, minNames } = getMinMaxAssignees();
@@ -2281,7 +2286,8 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
   }
-  renderAssignStats();
+  // 월 변경 시 봉사자별 횟수 뱃지 + 최다/최소 패널을 현재 달 기준으로 다시 계산
+  renderMemberList();
 }
 
 function renderCellSlots(dateStr) {
