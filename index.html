@@ -963,7 +963,7 @@ const FIXED_TIMES = {
   6: ['10:00', '18:00'],   // 토
 };
 
-// ── 특별 미사 라벨 { dow: 요일, week: 몇째, time, note } ──
+// ── 특별 미사 라벨 { dow: 요일, week: 몇째, time, note, dok2: 2독서 사용여부(선택) } ──
 const ROSARY = "📿";
 
 const SPECIAL_LABELS = [
@@ -977,6 +977,14 @@ const SPECIAL_LABELS = [
   { dow:6, week:4, time:'10:00', note:'찬미'       },  // 넷째 토
 ];
 
+// 기본적으로 1·2독서를 모두 두는 미사(요일+시간). 그 외는 1독서만.
+// 토 18:00(특전), 일 06:00·11:00
+function defaultHasDok2(dow, time) {
+  if (dow === 6 && time === '18:00') return true;
+  if (dow === 0 && (time === '06:00' || time === '11:00')) return true;
+  return false;
+}
+
 function getDefaultSlots(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dow     = new Date(y, m-1, d).getDay();
@@ -984,11 +992,13 @@ function getDefaultSlots(dateStr) {
 
   let times = [...(FIXED_TIMES[dow] || [])];
   let notes = {};
+  let dok2Override = {}; // time -> true (특별 미사에서 2독서 강제 활성화)
 
   SPECIAL_LABELS.forEach(sp => {
     if (sp.dow === dow && sp.week === weekNum) {
       if (!times.includes(sp.time)) times.push(sp.time); // 둘째 수 등 추가 미사
       notes[sp.time] = sp.note;
+      if (sp.dok2) dok2Override[sp.time] = true;
     }
   });
 
@@ -998,7 +1008,10 @@ function getDefaultSlots(dateStr) {
     return toMin(a) - toMin(b);
   });
 
-  return times.map(t => ({ time: t, note: notes[t] || '', haesul: '', dok1: '', dok2: '' }));
+  return times.map(t => {
+    const hasDok2 = dok2Override[t] || defaultHasDok2(dow, t);
+    return { time: t, note: notes[t] || '', haesul: '', dok1: '', dok2: hasDok2 ? '' : null, extraDoks: [] };
+  });
 }
 
 let timeSlots = ['10:00'];
@@ -1400,7 +1413,8 @@ function getAssignCounts() {
   members.forEach(m => counts[m] = 0);
   Object.values(scheduleData).forEach(slots => {
     slots.forEach(s => {
-      [s.haesul, s.dok1, s.dok2].forEach(name => {
+      const names = [s.haesul, s.dok1, s.dok2, ...(s.extraDoks || [])];
+      names.forEach(name => {
         if (name && name !== '(미배정)' && counts.hasOwnProperty(name)) counts[name]++;
       });
     });
@@ -1565,6 +1579,9 @@ function saveMemberEdit() {
       if (s.haesul === editingMemberName) s.haesul = newName;
       if (s.dok1   === editingMemberName) s.dok1   = newName;
       if (s.dok2   === editingMemberName) s.dok2   = newName;
+      if (Array.isArray(s.extraDoks)) {
+        s.extraDoks = s.extraDoks.map(n => n === editingMemberName ? newName : n);
+      }
     }));
   } else {
     memberRoles[editingMemberName] = newRole;
@@ -2286,6 +2303,9 @@ function renderCellSlots(dateStr) {
     if (s.haesul) html += `<span>해설 ${s.haesul}</span>`;
     if (s.dok1)   html += `<span>1독 ${s.dok1}</span>`;
     if (s.dok2)   html += `<span>2독 ${s.dok2}</span>`;
+    (s.extraDoks || []).forEach((name, idx) => {
+      if (name) html += `<span>${idx+3}독 ${name}</span>`;
+    });
     html += '</div>';
     div.innerHTML = html;
     c.appendChild(div);
@@ -2299,6 +2319,8 @@ function openAssign(dateStr, day, col) {
   if (!scheduleData[editingDate]) {
     scheduleData[editingDate] = getDefaultSlots(dateStr);
   }
+  // 구버전 데이터 호환: extraDoks 필드가 없으면 빈 배열로 보정
+  scheduleData[editingDate].forEach(s => { if (!Array.isArray(s.extraDoks)) s.extraDoks = []; });
   const dn = ['일','월','화','수','목','금','토'];
   document.getElementById('assignTitle').textContent = `${month}월 ${day}일 (${dn[col]}) 배정`;
   renderModalSlots();
@@ -2316,6 +2338,21 @@ function renderModalSlots() {
   (scheduleData[editingDate] || []).forEach((s, i) => {
     const item = document.createElement('div');
     item.className = 'modal-slot-item';
+    const dok2Field = (s.dok2 === null)
+      ? `<div class="field"><label>2독서</label>
+           <button type="button" class="btn btn-outline" style="width:100%;padding:6px;font-size:11px" onclick="toggleDok2(${i}, true)">+ 2독서 추가 (특별 미사용)</button>
+         </div>`
+      : `<div class="field"><label>2독서
+           <button type="button" onclick="toggleDok2(${i}, false)" style="float:right;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;text-decoration:underline">제거</button>
+         </label>${mkSelect(s.dok2,i,'dok2',dayNum,dow,s.time)}</div>`;
+    const extraDoks = s.extraDoks || [];
+    const extraFields = extraDoks.map((val, ei) => `
+      <div class="field"><label>${ei+3}독서
+        <button type="button" onclick="removeExtraDok(${i},${ei})" style="float:right;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;text-decoration:underline">제거</button>
+      </label>${mkExtraDokSelect(val, i, ei, dayNum, dow, s.time)}</div>`).join('');
+    const addExtraBtn = (s.dok2 !== null) // 2독서가 활성화된 경우에만 3독서 이상 추가 허용 (순서상 자연스러움)
+      ? `<button type="button" class="btn btn-outline" style="width:100%;padding:6px;font-size:11px;margin-top:4px" onclick="addExtraDok(${i})">+ ${extraDoks.length+3}독서 추가 (연중 특별 미사용)</button>`
+      : '';
     item.innerHTML = `
       <div class="slot-header">
         <span class="slot-label">미사 ${i+1}</span>
@@ -2329,9 +2366,15 @@ function renderModalSlots() {
       </div>
       <div class="field"><label>해설자</label>${mkSelect(s.haesul,i,'haesul',dayNum,dow,s.time)}</div>
       <div class="field"><label>1독서</label>${mkSelect(s.dok1,i,'dok1',dayNum,dow,s.time)}</div>
-      <div class="field"><label>2독서</label>${mkSelect(s.dok2,i,'dok2',dayNum,dow,s.time)}</div>`;
+      ${dok2Field}
+      ${extraFields}
+      ${addExtraBtn}`;
     list.appendChild(item);
   });
+}
+function toggleDok2(i, add) {
+  scheduleData[editingDate][i].dok2 = add ? '' : null;
+  renderModalSlots();
 }
 
 // ── 미사 시간 드롭다운 ──
@@ -2357,7 +2400,7 @@ function mkSelect(val, si, field, dayNum, dow, slotTime) {
   const filtered = members.filter(m => {
     const role = memberRoles[m] || 'both';
     if (field === 'haesul') return role === 'haesul' || role === 'both';
-    if (field === 'dok1' || field === 'dok2') return role === 'dok' || role === 'both';
+    if (field === 'dok1' || field === 'dok2' || field === 'extraDok') return role === 'dok' || role === 'both';
     return true;
   });
   const opts = filtered.map(m => {
@@ -2379,16 +2422,48 @@ function mkSelect(val, si, field, dayNum, dow, slotTime) {
   return `<select onchange="updSlot(${si},'${field}',this.value)"><option value="">-</option>${opts}</select>`;
 }
 
+// extraDoks[ei] (3독서, 4독서 ...) 전용 select — updSlot과 달리 배열 인덱스(si, ei)로 갱신
+function mkExtraDokSelect(val, si, ei, dayNum, dow, slotTime) {
+  const filtered = members.filter(m => { const role = memberRoles[m] || 'both'; return role === 'dok' || role === 'both'; });
+  const opts = filtered.map(m => {
+    const mav = availability[m] || {};
+    const av = mav[editingDate] !== undefined ? mav[editingDate] : mav[dayNum];
+    let icon = av==='ok' ? ' ✅' : av==='off' ? ' ❌' : '';
+    if (!icon && slotTime !== undefined && dow !== undefined) {
+      const mTO = (timeOff[m] || {})[dow] || [];
+      if (mTO.includes(slotTime)) icon = ' ⏰❌';
+    }
+    if (!icon && slotTime !== undefined && editingDate) {
+      const mDTO = (dateTimeOff[m] || {})[editingDate] || [];
+      if (mDTO.includes(slotTime)) icon = ' ⏰❌';
+    }
+    return `<option value="${m}" ${m===val?'selected':''}>${m}${icon}</option>`;
+  }).join('');
+  return `<select onchange="updExtraDok(${si},${ei},this.value)"><option value="">-</option>${opts}</select>`;
+}
+
 function updSlot(i, key, val) {
   if (!scheduleData[editingDate]) scheduleData[editingDate]=[];
   scheduleData[editingDate][i][key] = val;
+}
+function updExtraDok(si, ei, val) {
+  scheduleData[editingDate][si].extraDoks[ei] = val;
+}
+function addExtraDok(si) {
+  if (!scheduleData[editingDate][si].extraDoks) scheduleData[editingDate][si].extraDoks = [];
+  scheduleData[editingDate][si].extraDoks.push('');
+  renderModalSlots();
+}
+function removeExtraDok(si, ei) {
+  scheduleData[editingDate][si].extraDoks.splice(ei, 1);
+  renderModalSlots();
 }
 function removeSlot(i) { scheduleData[editingDate].splice(i,1); renderModalSlots(); }
 function addModalSlot() {
   if (!scheduleData[editingDate]) scheduleData[editingDate]=[];
   const defSlots = getDefaultSlots(editingDate);
   const defaultTime = defSlots.length ? defSlots[0].time : '10:00';
-  scheduleData[editingDate].push({time: defaultTime, haesul:'', dok1:'', dok2:'', note:''});
+  scheduleData[editingDate].push({time: defaultTime, haesul:'', dok1:'', dok2:'', note:'', extraDoks:[]});
   renderModalSlots();
 }
 function saveAssign() { renderCellSlots(editingDate); closeAssign(); saveData(); renderMemberList(); }
@@ -2466,11 +2541,16 @@ function autoAssign() {
     const defaultSlots = getDefaultSlots(dateStr);
     if (!defaultSlots.length) continue;
 
+    // 기존에 수동으로 넣어둔 extraDoks(3독서 이상)는 시간대 기준으로 보존
+    const prevSlots = scheduleData[dateStr] || [];
+    const prevExtraByTime = {};
+    prevSlots.forEach(s => { if (s.extraDoks && s.extraDoks.length) prevExtraByTime[s.time] = s.extraDoks; });
+
     scheduleData[dateStr] = defaultSlots.map(s => {
       const h  = pick('haesul', d, [], s.time);
       const d1 = pick('dok1',   d, [h], s.time);
-      const d2 = pick('dok2',   d, [h, d1], s.time);
-      return { time: s.time, note: s.note, haesul: h, dok1: d1, dok2: d2 };
+      const d2 = (s.dok2 === null) ? null : pick('dok2', d, [h, d1], s.time);
+      return { time: s.time, note: s.note, haesul: h, dok1: d1, dok2: d2, extraDoks: prevExtraByTime[s.time] || [] };
     });
   }
 
@@ -2743,6 +2823,7 @@ async function exportExcel() {
         if (s.haesul === name) cntHaesul++;
         if (s.dok1   === name) cntDok++;
         if (s.dok2   === name) cntDok++;
+        (s.extraDoks || []).forEach(n => { if (n === name) cntDok++; });
       });
     }
 
@@ -2793,6 +2874,7 @@ async function exportExcel() {
       if (s.haesul) totalHaesul++;
       if (s.dok1)   totalDok++;
       if (s.dok2)   totalDok++;
+      (s.extraDoks || []).forEach(n => { if (n) totalDok++; });
     });
   }
   [[12, totalHaesul, 'FFD4EDD4'], [13, totalDok, 'FFD4E0F5'], [14, totalHaesul+totalDok, 'FFFFE599']].forEach(([ci, val, argb]) => {
