@@ -1,0 +1,35 @@
+name: 교하성당 공지사항/주보안내 업데이트
+
+on:
+  schedule:
+    # 매일 KST 07:00, 13:00, 19:00 (UTC 22:00, 04:00, 10:00)
+    - cron: '0 22,4,10 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 공지사항/주보안내 가져오기
+        run: node scripts/fetch-kyoha.mjs
+
+      - name: 변경사항 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/kyoha-updates.json; then
+            echo "변경 없음"
+          else
+            git add data/kyoha-updates.json
+            git commit -m "chore: 교하성당 공지사항/주보안내 자동 업데이트"
+            git push
+          fi

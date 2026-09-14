@@ -437,6 +437,42 @@
     border-top: 1px dashed #eee;
     font-size: 10px; color: #999; text-align: right;
   }
+  /* ── 전례력 안내 카드 (다가오는 대축일·전례시기·절기, 미사등급 분류) ──
+     mass 프로젝트(khmass-liturgy.github.io/mass)와 계산 로직을 공유한다. */
+  .liturgy-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px; margin-top:18px; }
+  .lit-card {
+    display:block; border-radius:10px; padding:16px 18px; text-decoration:none;
+    box-shadow:0 4px 16px rgba(26,39,68,.15); transition:transform .2s, box-shadow .2s;
+    background:linear-gradient(135deg, var(--navy) 0%, #2a3d6e 100%); color:#fff;
+  }
+  .lit-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(26,39,68,.25); }
+  .lit-card::after { content:''; display:block; clear:both; }
+  .lit-card .lit-eyebrow { font-size:10px; font-weight:700; letter-spacing:1px; color:#aab3cc; text-transform:uppercase; }
+  .lit-card .lit-title { font-size:15px; font-weight:700; margin-top:4px; line-height:1.4; }
+  .lit-card .lit-date { margin-top:6px; font-size:12px; color:var(--gold); }
+  .lit-card .lit-sub { margin-top:5px; font-size:11px; color:#c7d0e8; line-height:1.5; }
+  .lit-badge {
+    float:right; margin:0 0 4px 8px; font-size:11px; font-weight:700; letter-spacing:.03em;
+    color:var(--navy); background:linear-gradient(135deg, var(--gold) 0%, #ddc27a 100%);
+    border-radius:12px; padding:3px 9px; white-space:nowrap;
+  }
+  .lit-card.lit-term { background:linear-gradient(135deg,#1e4033 0%,#24564a 100%); cursor:default; }
+  .lit-card.lit-term:hover { transform:none; box-shadow:0 4px 16px rgba(26,39,68,.15); }
+  .lit-card.lit-term .lit-date { color:#a8dcc0; }
+  .lit-card.lit-term .lit-sub .lit-hanja { color:#8fcbaa; font-weight:700; margin-right:4px; }
+  .lit-card.lit-grade {
+    background:var(--white); color:var(--navy);
+    border:1px solid var(--border); border-left:4px solid var(--gold); border-radius:0 10px 10px 0;
+    display:flex; flex-direction:column; gap:6px; justify-content:center;
+  }
+  .lit-card.lit-grade:hover { border-left-color:var(--navy); box-shadow:0 6px 20px rgba(26,39,68,.12); }
+  .lit-card.lit-grade .lit-top { display:flex; align-items:center; justify-content:space-between; }
+  .lit-card.lit-grade .lit-icon { font-size:18px; color:var(--gold); }
+  .lit-card.lit-grade .lit-go { font-size:12px; color:#c8c0ae; transition:transform .2s, color .2s; }
+  .lit-card.lit-grade:hover .lit-go { color:var(--navy); transform:translateX(3px); }
+  .lit-card.lit-grade .lit-name { font-family:'Noto Serif KR',serif; font-size:14px; font-weight:700; color:var(--navy); }
+  .lit-card.lit-grade .lit-desc { font-size:11px; color:var(--gray); line-height:1.5; }
+
   .feast-day { font-size:10px; color:var(--red); font-weight:700; line-height:1.4; margin:2px 0 0; word-break:keep-all; text-align:left; padding:0 2px; }
   .holiday-tag { font-size:10px; background:#fde8e8; color:var(--red); font-weight:700; border-radius:3px; padding:1px 4px; margin:2px 0 0; display:inline-block; word-break:keep-all; }
   .special-label { font-size:16px; font-weight:700; border-radius:3px; padding:1px 5px; margin:1px 1px 1px 0; display:inline-block; word-break:keep-all; background:#e8eeff; color:#2240c4; }
@@ -677,6 +713,38 @@
         <div class="parish-section-footer" id="kyohaBulletinsStatus"></div>
       </div>
     </div>
+
+    <!-- 전례력 안내 카드 — mass 프로젝트와 계산 로직을 공유한다 (liturgy-lib.js) -->
+    <div class="liturgy-cards" id="liturgyCards">
+      <a class="lit-card" id="ddayCard" href="https://missa.cbck.or.kr/DailyMissa" target="_blank" rel="noopener">
+        <span class="lit-badge" id="ddayBadge"></span>
+        <div class="lit-eyebrow">다가오는 대축일</div>
+        <div class="lit-title" id="ddayTitle">전례력을 계산하고 있습니다…</div>
+        <div class="lit-date" id="ddayDate"></div>
+      </a>
+
+      <a class="lit-card" id="seasonCard" href="https://missa.cbck.or.kr/DailyMissa" target="_blank" rel="noopener">
+        <span class="lit-badge" id="seasonBadge"></span>
+        <div class="lit-eyebrow">다가오는 전례 시기</div>
+        <div class="lit-title" id="seasonTitle">전례력을 계산하고 있습니다…</div>
+        <div class="lit-date" id="seasonDate"></div>
+        <div class="lit-sub" id="seasonNow"></div>
+      </a>
+
+      <div class="lit-card lit-term" id="termCard">
+        <span class="lit-badge" id="termBadge"></span>
+        <div class="lit-eyebrow">다가오는 절기</div>
+        <div class="lit-title" id="termTitle">절기를 계산하고 있습니다…</div>
+        <div class="lit-date" id="termDate"></div>
+        <div class="lit-sub" id="termMeaning"></div>
+      </div>
+
+      <a class="lit-card lit-grade" href="https://khmass-liturgy.github.io/mass/mass-grade-cards.html" target="_blank" rel="noopener">
+        <div class="lit-top"><span class="lit-icon">🎖️</span><span class="lit-go">→</span></div>
+        <div class="lit-name">전례력 미사 등급 분류</div>
+        <div class="lit-desc">대축일·축일·기념일·평일 등급과 거행 우선순위</div>
+      </a>
+    </div>
   </main>
 </div>
 
@@ -764,6 +832,11 @@
 </div>
 
 <div id="saveToast">💾 저장되었습니다</div>
+
+<!-- 전례력 계산 공용 라이브러리 — mass 프로젝트(khmass-liturgy/mass)와 함께 쓴다.
+     GitHub Pages가 정적 파일에 CORS를 허용해 주므로 다른 오리진에서도 그대로 불러 쓸 수 있다.
+     두 사이트가 같은 코드를 쓰므로 대축일·전례시기 계산이 서로 어긋나지 않는다. -->
+<script src="https://khmass-liturgy.github.io/mass/liturgy-lib.js"></script>
 
 <script>
 const TODAY = new Date();
@@ -1073,28 +1146,32 @@ const POPE_PRAYER_INTENTIONS = {
 };
 
 // ── 교하성당 공지사항·주보안내 폴백 데이터 ──
+// data/kyoha-updates.json(자동 크롤링) 및 실시간 조회가 모두 실패했을 때만 쓰이는 최후의 수단.
+// scripts/fetch-kyoha.mjs 를 수동 실행해 얻은 스냅샷(2026-09-14 기준)으로 갱신됨.
 const KYOHA_FALLBACK = {
   notices: [
+    { title: "의정부 교구 대회 pre - WYD 행사 및 참가 신청", date: "2026-07-25",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=38783" },
+    { title: "WYD 의정부 교구대회 홈스테이 가정 1차 모집", date: "2026-07-25",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=38782" },
+    { title: "가톨릭 PAY (하상앱) 실행에 대한 안내", date: "2026-06-27",
+      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=38239" },
     { title: "‘1본당 1난민가정 동행 사업’ 동행 활동가 양성 교육", date: "2026-05-10",
       url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37071" },
     { title: "청소년 주일 행사, 연극 관람 갑니다~", date: "2026-05-10",
       url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37070" },
-    { title: "민족화해부 <평화마중길> 도보 순례", date: "2026-05-03",
-      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=36884" },
-    { title: "5월 성모성월 묵주기도", date: "2026-04-26",
-      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=36714" },
-    { title: "부활맞이 대청소", date: "2026-03-14",
-      url: "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=35474" },
   ],
   bulletins: [
-    { title: "지극히 거룩하신 삼위일체 대축일", date: "2026-05-31",
-      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
-    { title: "성령 강림 대축일", date: "2026-05-24",
-      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
-    { title: "주님 승천 대축일 / 홍보 주일", date: "2026-05-17",
-      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
-    { title: "부활 제6주일", date: "2026-05-10",
-      url: "https://sd.uca.or.kr/kyoha/jubo.aspx?mnucd=20001570" },
+    { title: "연중 제24주일", date: "2026-09-13",
+      url: "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0913-875.pdf" },
+    { title: "연중 제23주일", date: "2026-09-06",
+      url: "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0906-874.pdf" },
+    { title: "연중 제22주일", date: "2026-08-30",
+      url: "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0830-873.pdf" },
+    { title: "연중 제21주일", date: "2026-08-23",
+      url: "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0823-872.pdf" },
+    { title: "연중 제20주일", date: "2026-08-16",
+      url: "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0816-871.pdf" },
   ]
 };
 
@@ -2188,18 +2265,45 @@ function parseKyohaHTML(html) {
   };
 }
 
+// 1순위: GitHub Actions가 주기적으로 sd.uca.or.kr을 직접 크롤링해 만들어두는
+// 동일 출처(same-origin) 정적 JSON. 브라우저 CORS 제약이 없어 가장 안정적으로 최신 데이터를 준다.
+async function fetchKyohaStaticJson() {
+  const res = await fetch('data/kyoha-updates.json', { cache: 'no-store' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data || (!data.notices?.length && !data.bulletins?.length)) return null;
+  return data;
+}
+
 async function loadKyohaUpdates() {
-  // 1) 캐시 확인 — 있으면 즉시 표시
+  // 0) 캐시 확인 — 있으면 즉시 표시 (화면 깜빡임 방지용, 아래에서 최신 데이터로 갱신 시도)
   const cached = readKyohaCache();
   if (cached) {
     renderParishList('kyohaNotices',   cached.notices,   'kyohaNoticesStatus',   'sd.uca.or.kr (캐시됨)');
     renderParishList('kyohaBulletins', cached.bulletins, 'kyohaBulletinsStatus', 'sd.uca.or.kr (캐시됨)');
-    return;
+  } else {
+    // 내장 데이터로 우선 표시 (최후의 수단)
+    renderParishList('kyohaNotices',   KYOHA_FALLBACK.notices,   'kyohaNoticesStatus',   '내장 데이터');
+    renderParishList('kyohaBulletins', KYOHA_FALLBACK.bulletins, 'kyohaBulletinsStatus', '내장 데이터');
   }
-  // 2) 내장 데이터로 우선 표시
-  renderParishList('kyohaNotices',   KYOHA_FALLBACK.notices,   'kyohaNoticesStatus',   '내장 데이터');
-  renderParishList('kyohaBulletins', KYOHA_FALLBACK.bulletins, 'kyohaBulletinsStatus', '내장 데이터');
-  // 3) 백그라운드로 sd.uca.or.kr 시도
+
+  // 1) 정적 JSON(자동 크롤링 결과) 시도 — 가장 신뢰도 높음
+  try {
+    const staticData = await fetchKyohaStaticJson();
+    if (staticData) {
+      const notices   = staticData.notices?.length   ? staticData.notices   : KYOHA_FALLBACK.notices;
+      const bulletins = staticData.bulletins?.length ? staticData.bulletins : KYOHA_FALLBACK.bulletins;
+      const label = staticData.updatedAt
+        ? `sd.uca.or.kr (${new Date(staticData.updatedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 기준)`
+        : 'sd.uca.or.kr';
+      renderParishList('kyohaNotices',   notices,   'kyohaNoticesStatus',   label);
+      renderParishList('kyohaBulletins', bulletins, 'kyohaBulletinsStatus', label);
+      writeKyohaCache(notices, bulletins);
+      return;
+    }
+  } catch (e) { /* 다음 방법 시도 */ }
+
+  // 2) CORS 프록시를 통한 브라우저 직접 크롤링 (정적 JSON이 없거나 실패했을 때의 보조 수단)
   try {
     const fresh = await fetchKyohaUpdates();
     if (fresh) {
@@ -3074,6 +3178,117 @@ async function downloadExcelTemplate() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+// ── 전례력 안내 카드: 다가오는 대축일 / 전례 시기 / 절기 ──
+// 계산 로직은 liturgy-lib.js(mass 프로젝트와 공유)에서 온다.
+// 라이브러리가 다른 오리진에서 로드되므로 실패(오프라인 등)해도 카드가 자리를 차지하지 않게 감싼다.
+
+function renderNextSolemnity() {
+  const titleEl = document.getElementById('ddayTitle');
+  const dateEl  = document.getElementById('ddayDate');
+  const badgeEl = document.getElementById('ddayBadge');
+  const card    = document.getElementById('ddayCard');
+  if (!titleEl || !window.Liturgy || !window.kstNow) return;
+
+  const today = window.kstNow().date;
+  const y = today.getFullYear();
+  const list = window.Liturgy.solemnitiesOf(y).concat(window.Liturgy.solemnitiesOf(y + 1));
+  const next = list.find(it => it.date.getTime() >= today.getTime());
+  if (!next) return;
+
+  const diff = Math.round((next.date - today) / 86400000);
+  const DOW = ['주일','월','화','수','목','금','토'];
+  titleEl.textContent = next.name;
+  if (dateEl) dateEl.textContent = (next.date.getMonth() + 1) + '월 ' + next.date.getDate() + '일 (' + DOW[next.date.getDay()] + ')';
+  if (badgeEl) badgeEl.textContent = diff === 0 ? '오늘' : 'D-' + diff;
+  if (card) {
+    const ymd = next.date.getFullYear() + ('0' + (next.date.getMonth() + 1)).slice(-2) + ('0' + next.date.getDate()).slice(-2);
+    card.href = 'https://missa.cbck.or.kr/DailyMissa/' + ymd;
+  }
+}
+
+function renderNextSeason() {
+  const titleEl = document.getElementById('seasonTitle');
+  if (!titleEl || !window.Liturgy || !window.Liturgy.nextSeasonAfter || !window.kstNow) return;
+  const dateEl  = document.getElementById('seasonDate');
+  const nowEl   = document.getElementById('seasonNow');
+  const badgeEl = document.getElementById('seasonBadge');
+  const card    = document.getElementById('seasonCard');
+
+  const today = window.kstNow().date;
+  const next  = window.Liturgy.nextSeasonAfter(today);
+  const cur   = window.Liturgy.seasonAt(today);
+  if (!next) return;
+
+  const DOW = ['주일','월','화','수','목','금','토'];
+  const korDate = d => (d.getFullYear() === today.getFullYear() ? '' : d.getFullYear() + '년 ')
+    + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')';
+
+  const diff = Math.round((next.start - today) / 86400000);
+  titleEl.textContent = next.name;
+  if (dateEl) dateEl.textContent = korDate(next.start) + ' 시작 · 전례색 ' + next.color;
+  if (nowEl && cur) {
+    const end = cur.end
+      ? (cur.end.getFullYear() === today.getFullYear() ? '' : cur.end.getFullYear() + '년 ') + (cur.end.getMonth() + 1) + '월 ' + cur.end.getDate() + '일까지'
+      : '';
+    nowEl.textContent = '지금은 ' + cur.name + (end ? ' · ' + end : '');
+  }
+  if (badgeEl) badgeEl.textContent = diff === 0 ? '오늘' : 'D-' + diff;
+  if (card) {
+    const ymd = next.start.getFullYear() + ('0' + (next.start.getMonth() + 1)).slice(-2) + ('0' + next.start.getDate()).slice(-2);
+    card.href = 'https://missa.cbck.or.kr/DailyMissa/' + ymd;
+  }
+}
+
+function renderNextTerm() {
+  const titleEl = document.getElementById('termTitle');
+  if (!titleEl || !window.SolarTerms) return;
+  const dateEl  = document.getElementById('termDate');
+  const badgeEl = document.getElementById('termBadge');
+
+  const now  = new Date();
+  const next = window.SolarTerms.next(now);
+
+  const kstYmd   = d => d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+  const toUtcNoon = ymdStr => { const p = ymdStr.split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); };
+  const diff = Math.round((toUtcNoon(kstYmd(next.date)) - toUtcNoon(kstYmd(now))) / 86400000);
+
+  const fmt = { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short' };
+  titleEl.textContent = next.name;
+  if (dateEl) dateEl.textContent = next.date.toLocaleDateString('ko-KR', fmt);
+  if (badgeEl) badgeEl.textContent = diff === 0 ? '오늘' : 'D-' + diff;
+
+  const meaningEl = document.getElementById('termMeaning');
+  const mean = window.SolarTerms.meaningOf(next.name);
+  if (meaningEl && mean) {
+    meaningEl.innerHTML = '';
+    const h = document.createElement('span');
+    h.className = 'lit-hanja';
+    h.textContent = mean.hanja;
+    meaningEl.appendChild(h);
+    meaningEl.appendChild(document.createTextNode(mean.text));
+  }
+}
+
+function renderLiturgyCards() {
+  try { renderNextSolemnity(); } catch (e) { console.warn('다가오는 대축일 계산 실패:', e); }
+  try { renderNextSeason();    } catch (e) { console.warn('다가오는 전례 시기 계산 실패:', e); }
+  try { renderNextTerm();      } catch (e) { console.warn('다가오는 절기 계산 실패:', e); }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    // liturgy-lib.js가 외부 오리진에서 오므로 로드 시점이 DOMContentLoaded보다 늦을 수 있다.
+    if (window.Liturgy && window.SolarTerms) {
+      renderLiturgyCards();
+    } else {
+      document.querySelector('script[src*="liturgy-lib.js"]')
+        ?.addEventListener('load', renderLiturgyCards);
+      // 스크립트 로드도 실패하는 경우(오프라인 등)를 대비한 최후의 재시도
+      setTimeout(renderLiturgyCards, 1500);
+    }
+  });
 }
 </script>
 <footer class="church-footer">
