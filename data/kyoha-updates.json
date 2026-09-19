@@ -28,6 +28,11 @@
   ],
   "bulletins": [
     {
+      "title": "성 김대건 안드레아 사제와 성 정하상 바오로와 동료순교자들 대축일",
+      "date": "2026-09-20",
+      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0920-876.pdf"
+    },
+    {
       "title": "연중 제24주일",
       "date": "2026-09-13",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0913-875.pdf"
@@ -46,13 +51,8 @@
       "title": "연중 제21주일",
       "date": "2026-08-23",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0823-872.pdf"
-    },
-    {
-      "title": "연중 제20주일",
-      "date": "2026-08-16",
-      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0816-871.pdf"
     }
   ],
-  "updatedAt": "2026-09-18T23:46:59.244Z",
+  "updatedAt": "2026-09-19T08:25:07.854Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
