@@ -28,6 +28,11 @@
   ],
   "bulletins": [
     {
+      "title": "연중 제26주일 / 세계 이주민과 난민의 날",
+      "date": "2026-09-27",
+      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0927-877.pdf"
+    },
+    {
       "title": "성 김대건 안드레아 사제와 성 정하상 바오로와 동료순교자들 대축일",
       "date": "2026-09-20",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0920-876.pdf"
@@ -46,13 +51,8 @@
       "title": "연중 제22주일",
       "date": "2026-08-30",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0830-873.pdf"
-    },
-    {
-      "title": "연중 제21주일",
-      "date": "2026-08-23",
-      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0823-872.pdf"
     }
   ],
-  "updatedAt": "2026-09-26T00:17:58.979Z",
+  "updatedAt": "2026-09-26T08:57:30.110Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
