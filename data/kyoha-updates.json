@@ -28,6 +28,11 @@
   ],
   "bulletins": [
     {
+      "title": "연중 제27주일",
+      "date": "2026-10-04",
+      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1004-878.pdf"
+    },
+    {
       "title": "연중 제26주일 / 세계 이주민과 난민의 날",
       "date": "2026-09-27",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0927-877.pdf"
@@ -46,13 +51,8 @@
       "title": "연중 제23주일",
       "date": "2026-09-06",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0906-874.pdf"
-    },
-    {
-      "title": "연중 제22주일",
-      "date": "2026-08-30",
-      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0830-873.pdf"
     }
   ],
-  "updatedAt": "2026-10-03T00:51:22.688Z",
+  "updatedAt": "2026-10-03T09:33:50.022Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
