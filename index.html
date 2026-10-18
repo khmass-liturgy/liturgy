@@ -507,6 +507,24 @@
   .stat-chip-min { background:#1e40af; color:#fff; }
   .stat-chip:hover { opacity:0.8; }
   .assign-stats-warn { border-color:var(--red); background:#fdf1f1; }
+  .stats-table { border-collapse:collapse; font-size:12px; white-space:nowrap; }
+  .stats-table th, .stats-table td { border:1px solid var(--border); padding:5px 8px; text-align:center; }
+  .stats-table thead th { background:var(--navy); color:#fff; position:sticky; top:0; z-index:2; }
+  .stats-table td.name, .stats-table th.name { text-align:left; position:sticky; left:0; background:#fff; font-weight:700; z-index:1; }
+  .stats-table thead th.name { background:var(--navy); z-index:3; }
+  .stats-table tr.sumrow td { background:var(--light); font-weight:700; }
+  .stats-table td.tot { background:#faf6e8; font-weight:700; }
+  .stats-table td.zero { color:#bbb; }
+  .stats-table td.hi { color:var(--red); }
+  .stats-table td.lo { color:#1e40af; }
+  .stats-cards { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .stats-card { background:var(--light); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px; color:var(--gray); }
+  .stats-card b { display:block; font-size:16px; color:var(--navy); }
+  .archive-item { display:flex; align-items:center; gap:6px; padding:5px 8px; background:var(--light); border-radius:6px; margin-bottom:4px; font-size:12px; }
+  .archive-item .ai-name { font-weight:700; flex:1; }
+  .archive-item .ai-sub { font-size:10px; color:var(--gray); font-weight:400; }
+  .archive-item button { font-size:11px; padding:2px 7px; border:1px solid var(--border); background:#fff; border-radius:5px; cursor:pointer; font-family:inherit; }
+  .archive-item button:hover { border-color:var(--navy); }
   .assign-issues { margin-top:8px; border-top:1px dashed var(--border); padding-top:6px; }
   .assign-issues-title { font-weight:700; color:var(--red); margin-bottom:4px; }
   .assign-issue { padding:5px 6px; border-radius:6px; cursor:pointer; line-height:1.5; }
@@ -662,6 +680,14 @@
       <p style="font-size:10px;color:var(--gray);margin-bottom:7px">봉사자별 개별 범위는 이름을 눌러 설정합니다. 가능일 때문에 범위를 지킬 수 없는 경우에는 배정 후 알려드립니다.</p>
       <button class="btn btn-gold" onclick="autoAssign()">자동 배정 실행</button>
       <button class="btn btn-outline" onclick="clearAll()">전체 초기화</button>
+    </div>
+
+    <div>
+      <div class="section-title">📚 월별 전례표 최종 저장</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">매월 완성된 전례표를 저장해 두면 누적 통계를 낼 수 있습니다.</p>
+      <button class="btn btn-gold" onclick="saveMonthFinal()">✅ 이번 달 전례표 최종 저장</button>
+      <button class="btn btn-primary" style="margin-top:4px" onclick="openStats()">📊 전체 통계 보기</button>
+      <div id="archiveList" style="margin-top:8px"></div>
     </div>
 
     <div>
@@ -879,6 +905,21 @@
       <button class="btn btn-outline" onclick="closeAvail()">닫기</button>
       <button class="btn btn-primary" onclick="closeAvail()">확인</button>
     </div>
+  </div>
+</div>
+
+<!-- 전체 통계 모달 -->
+<div class="modal-overlay" id="statsOverlay" onclick="if(event.target===this)closeStats()">
+  <div class="modal" style="width:min(1000px,96vw)">
+    <h2>📊 전례단 전체 통계</h2>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <label style="margin:0;display:inline">기간</label>
+      <select id="statsYear" style="width:auto" onchange="renderStats()"></select>
+      <button class="btn btn-gold" style="width:auto;padding:8px 14px;margin:0" onclick="exportStatsExcel()">📗 엑셀로 저장</button>
+    </div>
+    <div id="statsSummary"></div>
+    <div id="statsBody" style="overflow:auto;max-height:55vh"></div>
+    <div class="modal-btns"><button class="btn btn-primary" onclick="closeStats()">닫기</button></div>
   </div>
 </div>
 
@@ -1171,6 +1212,8 @@ let dateTimeOff = {};
 // avoidPairs = [['이름A','이름B'], ...]  같은 미사에 함께 배정하면 안 되는 조합
 let avoidPairs = [];
 // 월 배정 횟수 범위: 개별(memberMinCount/memberMaxCount[name]) 값이 없으면 공통값(기본 5~7회, null이면 제한 없음)
+// archive["YYYY-MM"] = { savedAt, schedule:{날짜:[슬롯]}, counts:{이름:{haesul,dok}}, unassigned, slots } — 매월 최종 저장본
+let archive = {};
 let memberMinCount = {};
 let memberMaxCount = {};
 let defaultMinCount = 5;
@@ -1253,14 +1296,14 @@ const KYOHA_FALLBACK = {
 // ── 로컬스토리지 저장/불러오기 ──
 function saveData() {
   try {
-    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
+    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, archive, scheduleData };
     localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
     showSaveToast();
   } catch(e) { console.warn('저장 실패:', e); }
   scheduleCloudSave();
 }
 function snapshotData() {
-  return { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
+  return { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, archive, scheduleData };
 }
 function loadData() {
   try {
@@ -1276,6 +1319,7 @@ function loadData() {
     if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
     if (data.memberMinCount) memberMinCount = data.memberMinCount;
     if (data.memberMaxCount) memberMaxCount = data.memberMaxCount;
+    if (data.archive) archive = data.archive;
     if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
     if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
     if (data.scheduleData) scheduleData = data.scheduleData;
@@ -1298,7 +1342,7 @@ function showSaveToast() {
   t._timer = setTimeout(() => t.classList.remove('show'), 1800);
 }
 function exportData() {
-  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
+  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, archive, scheduleData };
   const json =JSON.stringify(data, null, 2);
   const d = new Date();
   const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
@@ -1330,6 +1374,7 @@ function importData(event) {
       if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
       if (data.memberMinCount) memberMinCount = data.memberMinCount;
       if (data.memberMaxCount) memberMaxCount = data.memberMaxCount;
+      if (data.archive) archive = data.archive;
       if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
       if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
       if (data.scheduleData) scheduleData = data.scheduleData;
@@ -1533,6 +1578,175 @@ function clearStorage() {
   alert('초기화 완료 (봉사자 명단은 유지됨)');
 }
 
+/* ════════════════════ 월별 전례표 최종 저장 · 전체 통계 ════════════════════ */
+const monthKeyOf = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+const escHtml = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// 한 달치 배정(schedule: {날짜:[슬롯]})에서 봉사자별 해설/독서 횟수를 센다
+function computeMonthCounts(schedule) {
+  const per = {}; let unassigned = 0, slots = 0;
+  Object.values(schedule).forEach(list => list.forEach(s => {
+    slots++;
+    const add = (name, role) => {
+      if (!name) return;
+      if (name === '(미배정)') { unassigned++; return; }
+      (per[name] || (per[name] = { haesul: 0, dok: 0 }))[role]++;
+    };
+    add(s.haesul, 'haesul'); add(s.dok1, 'dok'); add(s.dok2, 'dok');
+    (s.extraDoks || []).forEach(n => add(n, 'dok'));
+  }));
+  return { per, unassigned, slots };
+}
+
+function saveMonthFinal() {
+  const key = monthKeyOf(year, month), prefix = key + '-';
+  const sched = {};
+  Object.entries(scheduleData).forEach(([d, list]) => {
+    if (d.startsWith(prefix) && Array.isArray(list) && list.length) sched[d] = JSON.parse(JSON.stringify(list));
+  });
+  const { per, unassigned, slots } = computeMonthCounts(sched);
+  if (!Object.keys(per).length) { alert(`${year}년 ${month}월에 배정된 전례표가 없습니다.\n먼저 자동 배정을 실행하거나 배정을 입력해 주세요.`); return; }
+  let msg = `${year}년 ${month}월 전례표를 최종 저장할까요?\n(미사 ${slots}회 · 배정 ${Object.values(per).reduce((a, o) => a + o.haesul + o.dok, 0)}건)`;
+  if (unassigned) msg += `\n\n⚠️ 미배정 자리가 ${unassigned}개 남아 있습니다.`;
+  if (archive[key]) msg += `\n\n이미 저장된 ${month}월 기록이 있습니다. 새 내용으로 덮어씁니다.`;
+  if (!confirm(msg)) return;
+  archive[key] = { savedAt: new Date().toISOString(), schedule: sched, counts: per, unassigned, slots };
+  saveData();
+  renderArchiveList();
+  alert(`✅ ${year}년 ${month}월 전례표가 최종 저장되었습니다.\n[📊 전체 통계 보기]에서 누적 통계를 확인할 수 있습니다.`);
+}
+
+function renderArchiveList() {
+  const el = document.getElementById('archiveList');
+  if (!el) return;
+  const keys = Object.keys(archive).sort().reverse();
+  if (!keys.length) { el.innerHTML = '<div style="font-size:11px;color:var(--gray)">저장된 달이 없습니다.</div>'; return; }
+  el.innerHTML = keys.map(k => {
+    const a = archive[k], [y, m] = k.split('-').map(Number);
+    const t = a.savedAt ? new Date(a.savedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : '';
+    return `<div class="archive-item">
+      <span class="ai-name">${y}년 ${m}월 <span class="ai-sub">미사 ${a.slots}회${a.unassigned ? ' · 미배정 ' + a.unassigned : ''} · ${t} 저장</span></span>
+      <button onclick="loadArchivedMonth('${k}')" title="이 달의 저장본을 화면으로 불러오기">보기</button>
+      <button onclick="deleteArchivedMonth('${k}')" title="저장본 삭제" style="color:var(--red)">삭제</button>
+    </div>`;
+  }).join('');
+}
+
+function loadArchivedMonth(key) {
+  const a = archive[key]; if (!a) return;
+  const [y, m] = key.split('-').map(Number);
+  if (!confirm(`${y}년 ${m}월 저장본을 화면으로 불러올까요?\n(현재 화면의 ${y}년 ${m}월 배정은 저장본 내용으로 대체됩니다)`)) return;
+  Object.keys(scheduleData).forEach(d => { if (d.startsWith(key + '-')) delete scheduleData[d]; });
+  Object.entries(a.schedule).forEach(([d, list]) => { scheduleData[d] = JSON.parse(JSON.stringify(list)); });
+  year = y; month = m;
+  document.getElementById('yearInput').value = y;
+  document.getElementById('monthInput').value = m;
+  renderCalendar(); renderMemberList(); saveData();
+}
+
+function deleteArchivedMonth(key) {
+  const [y, m] = key.split('-').map(Number);
+  if (!confirm(`${y}년 ${m}월 저장본을 삭제할까요?\n(통계에서도 빠집니다. 화면의 현재 배정은 그대로 남습니다)`)) return;
+  delete archive[key];
+  saveData(); renderArchiveList();
+  if (document.getElementById('statsOverlay').classList.contains('open')) renderStats();
+}
+
+// ── 통계 ──
+function buildStats() {
+  const sel = document.getElementById('statsYear').value || 'all';
+  const keys = Object.keys(archive).sort().filter(k => sel === 'all' || k.startsWith(sel + '-'));
+  const names = new Set(members);
+  keys.forEach(k => Object.keys(archive[k].counts || {}).forEach(n => names.add(n)));
+  const rows = [...names].map(n => {
+    const cells = keys.map(k => (archive[k].counts || {})[n] || { haesul: 0, dok: 0 });
+    const haesul = cells.reduce((a, c) => a + c.haesul, 0), dok = cells.reduce((a, c) => a + c.dok, 0);
+    const total = haesul + dok;
+    return { name: n, removed: !members.includes(n), cells, haesul, dok, total, avg: keys.length ? total / keys.length : 0 };
+  }).filter(r => r.total > 0 || !r.removed).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ko'));
+  const colTotals = keys.map((k, i) => rows.reduce((a, r) => a + r.cells[i].haesul + r.cells[i].dok, 0));
+  return { keys, rows, colTotals };
+}
+
+function renderStats() {
+  const { keys, rows, colTotals } = buildStats();
+  const sumEl = document.getElementById('statsSummary'), bodyEl = document.getElementById('statsBody');
+  if (!keys.length) {
+    sumEl.innerHTML = '';
+    bodyEl.innerHTML = '<div style="padding:30px;text-align:center;color:var(--gray)">저장된 전례표가 없습니다.<br>매월 전례표를 완성한 뒤 [✅ 이번 달 전례표 최종 저장]을 눌러 주세요.</div>';
+    return;
+  }
+  const active = rows.filter(r => r.total > 0);
+  const totals = active.map(r => r.total);
+  const max = totals.length ? Math.max(...totals) : 0, min = totals.length ? Math.min(...totals) : 0;
+  const totalAssign = colTotals.reduce((a, b) => a + b, 0);
+  const totalMasses = keys.reduce((a, k) => a + (archive[k].slots || 0), 0);
+  const unassigned = keys.reduce((a, k) => a + (archive[k].unassigned || 0), 0);
+  const avgPer = active.length ? (totalAssign / active.length) : 0;
+  sumEl.innerHTML = `<div class="stats-cards">
+    <div class="stats-card">저장된 달<b>${keys.length}개월</b></div>
+    <div class="stats-card">총 미사<b>${totalMasses}회</b></div>
+    <div class="stats-card">총 배정<b>${totalAssign}건</b></div>
+    <div class="stats-card">참여 인원<b>${active.length}명</b></div>
+    <div class="stats-card">1인 평균<b>${avgPer.toFixed(1)}회</b></div>
+    <div class="stats-card">최다 / 최소<b>${max}회 / ${min}회 (편차 ${max - min})</b></div>
+    ${unassigned ? `<div class="stats-card" style="border-color:var(--red)">미배정 자리<b style="color:var(--red)">${unassigned}개</b></div>` : ''}
+  </div>`;
+  const head = keys.map(k => { const [y, m] = k.split('-'); return `<th>${String(y).slice(2)}.${+m}월</th>`; }).join('');
+  const body = rows.map(r => {
+    const cls = r.total === 0 ? '' : (r.total === max && max > min ? 'hi' : r.total === min && max > min ? 'lo' : '');
+    const cells = r.cells.map((c, i) => {
+      const t = c.haesul + c.dok;
+      return `<td class="${t ? '' : 'zero'}" title="${escHtml(r.name)} · ${keys[i]}: 해설 ${c.haesul} · 독서 ${c.dok}">${t || '·'}</td>`;
+    }).join('');
+    return `<tr><td class="name">${escHtml(r.name)}${r.removed ? ' <span style="font-weight:400;color:var(--gray);font-size:10px">(명단 제외)</span>' : ''}</td>${cells}
+      <td>${r.haesul}</td><td>${r.dok}</td><td class="tot ${cls}">${r.total}</td><td>${r.avg.toFixed(1)}</td></tr>`;
+  }).join('');
+  const sumRow = `<tr class="sumrow"><td class="name" style="background:var(--light)">월 합계</td>${colTotals.map(t => `<td>${t}</td>`).join('')}
+    <td>${rows.reduce((a, r) => a + r.haesul, 0)}</td><td>${rows.reduce((a, r) => a + r.dok, 0)}</td><td>${totalAssign}</td><td></td></tr>`;
+  bodyEl.innerHTML = `<table class="stats-table"><thead><tr><th class="name">이름</th>${head}<th>해설계</th><th>독서계</th><th>총계</th><th>월평균</th></tr></thead>
+    <tbody>${body}${sumRow}</tbody></table>
+    <div style="font-size:11px;color:var(--gray);margin-top:8px">· 숫자는 그 달의 배정 횟수(해설+독서)이며, 칸에 마우스를 올리면 해설/독서가 나뉘어 보입니다. 총계 기준 <span style="color:var(--red)">최다</span>·<span style="color:#1e40af">최소</span> 표시.</div>`;
+}
+
+function openStats() {
+  const years = [...new Set(Object.keys(archive).map(k => k.slice(0, 4)))].sort().reverse();
+  const sel = document.getElementById('statsYear'), prev = sel.value;
+  sel.innerHTML = '<option value="all">전체 기간</option>' + years.map(y => `<option value="${y}">${y}년</option>`).join('');
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  document.getElementById('statsOverlay').classList.add('open');
+  renderStats();
+}
+function closeStats() { document.getElementById('statsOverlay').classList.remove('open'); }
+
+async function exportStatsExcel() {
+  if (typeof ExcelJS === 'undefined') { alert('엑셀 라이브러리를 불러오는 중입니다.\n잠시 후 다시 시도해주세요. (인터넷 연결 필요)'); return; }
+  const { keys, rows, colTotals } = buildStats();
+  if (!keys.length) { alert('저장된 전례표가 없어 내보낼 통계가 없습니다.'); return; }
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('전체 통계');
+  const hdr = ['이름', ...keys.map(k => { const [y, m] = k.split('-'); return `${y}.${+m}월`; }), '해설계', '독서계', '총계', '월평균'];
+  ws.addRow(hdr);
+  rows.forEach(r => ws.addRow([r.name, ...r.cells.map(c => c.haesul + c.dok), r.haesul, r.dok, r.total, +r.avg.toFixed(1)]));
+  ws.addRow(['월 합계', ...colTotals, rows.reduce((a, r) => a + r.haesul, 0), rows.reduce((a, r) => a + r.dok, 0), colTotals.reduce((a, b) => a + b, 0), '']);
+  const thin = { style: 'thin' };
+  ws.eachRow((row, i) => row.eachCell(c => {
+    c.border = { left: thin, right: thin, top: thin, bottom: thin };
+    c.alignment = { horizontal: 'center', vertical: 'middle' };
+    c.font = { name: '맑은 고딕', size: 10, bold: i === 1 || i === ws.rowCount };
+    if (i === 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+  }));
+  ws.getColumn(1).width = 14;
+  for (let c = 2; c <= hdr.length; c++) ws.getColumn(c).width = 9;
+  ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+  const buf = await wb.xlsx.writeBuffer();
+  const bytes = new Uint8Array(buf); let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  const a = document.createElement('a');
+  a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + btoa(bin);
+  a.download = `전례단_전체통계_${keys[0]}_${keys[keys.length - 1]}.xlsx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
 /* ════════════════════ Firebase 클라우드 저장 + 구글 로그인 ════════════════════ */
 // 모든 데이터를 Realtime Database(khmass-jeonrye)의 jeonrye/liturgy 에 저장한다.
 // (apiKey는 비밀번호가 아니라 프로젝트 식별용 값이라 코드에 있어도 안전하다. 실제 보안은 구글 로그인과
@@ -1627,6 +1841,7 @@ function applyLoadedData(data) {
     avoidPairs = data.avoidPairs || [];
     memberMinCount = data.memberMinCount || {};
     memberMaxCount = data.memberMaxCount || {};
+    archive = data.archive || {};
     if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
     if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
     scheduleData = data.scheduleData || {};
@@ -1637,6 +1852,7 @@ function applyLoadedData(data) {
     document.getElementById('defaultMaxCount').value = defaultMaxCount ?? '';
     renderMemberList();
     renderCalendar();
+    renderArchiveList();
     try { localStorage.setItem('liturgySchedule_members', JSON.stringify(snapshotData())); } catch (e) {}
   } finally { fbLoadingFromCloud = false; }
 }
@@ -1748,6 +1964,7 @@ document.getElementById('defaultMinCount').value = defaultMinCount ?? '';
 document.getElementById('defaultMaxCount').value = defaultMaxCount ?? '';
 renderMemberList();
 renderCalendar();
+renderArchiveList();
 
 // ── 월 최대 배정 횟수 ──
 function parseCap(v) {
