@@ -24,6 +24,16 @@
     padding: 16px 28px; display: flex; align-items: center; gap: 14px;
     border-bottom: 3px solid var(--gold);
   }
+  header { flex-wrap: wrap; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .hbtn {
+    padding: 8px 14px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.35);
+    background: transparent; color: #fff; font-size: 13px; font-weight: 700; font-family: inherit;
+    cursor: pointer; letter-spacing: .5px; white-space: nowrap; transition: all .2s;
+  }
+  .hbtn:hover { background: rgba(255,255,255,0.14); border-color: #fff; }
+  .hbtn-gold { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+  .hbtn-gold:hover { background: #d6b95a; border-color: #d6b95a; }
   header .cross { font-size: 26px; color: var(--gold); }
   header h1 { font-family: 'Noto Serif KR', serif; font-size: 20px; font-weight: 700; letter-spacing: 2px; }
   header p  { font-size: 11px; color: #aab3cc; margin-top: 2px; }
@@ -445,7 +455,17 @@
   }
   /* ── 전례력 안내 카드 (다가오는 대축일·전례시기·절기, 미사등급 분류) ──
      mass 프로젝트(khmass-liturgy.github.io/mass)와 계산 로직을 공유한다. */
-  .liturgy-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px; margin-top:18px; }
+  .liturgy-cards { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; margin-top:18px; align-items:start; }
+  #ddayCard   { grid-column:1; grid-row:1; }
+  #seasonCard { grid-column:2; grid-row:1; }
+  #termCard   { grid-column:1; grid-row:2; }
+  .lit-month  { grid-column:1; grid-row:3; }
+  .lit-card.lit-grade { grid-column:2; grid-row:2; }
+  @media (max-width:700px) {
+    .liturgy-cards { grid-template-columns:1fr; }
+    #ddayCard, #seasonCard, #termCard, .lit-month, .lit-card.lit-grade { grid-column:1; grid-row:auto; }
+  }
+  .lit-month { background:linear-gradient(135deg, #1a2744 0%, #2a3d6e 100%); border-radius:10px; padding:14px 16px; color:#fff; box-shadow:0 4px 16px rgba(26,39,68,.15); }
   .lit-card {
     display:block; border-radius:10px; padding:16px 18px; text-decoration:none;
     box-shadow:0 4px 16px rgba(26,39,68,.15); transition:transform .2s, box-shadow .2s;
@@ -566,6 +586,10 @@
   <div>
     <h1>교하성당 전례단 시간표 작성기</h1>
     <p>해설자 · 독서자 배정 및 가능일 관리</p>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" onclick="window.print()" title="인쇄 또는 PDF로 저장">🖨️ 인쇄 / PDF</button>
+    <button class="hbtn hbtn-gold" onclick="exportExcel()" title="전례표를 엑셀 파일로 저장">📊 엑셀 저장</button>
   </div>
 </header>
 
@@ -690,31 +714,7 @@
       <div id="archiveList" style="margin-top:8px"></div>
     </div>
 
-    <div>
-      <div class="section-title">🖨️ 출력</div>
-      <button class="btn btn-primary" onclick="window.print()">인쇄 / PDF 저장</button>
-      <button class="btn btn-gold" onclick="exportExcel()" style="margin-top:6px">📊 엑셀로 저장</button>
-    </div>
 
-    <div>
-      <div class="section-title">✝️ 월별 주요 전례</div>
-      <div class="missa-panel">
-        <div class="missa-panel-header">
-          <span class="missa-logo">✠</span>
-          <div>
-            <div class="missa-title">한국천주교주교회의</div>
-            <div class="missa-sub">매일미사 · 월별 주요전례</div>
-          </div>
-        </div>
-        <div class="missa-month" id="missaMonthLabel"></div>
-        <a id="missaLink" href="https://missa.cbck.or.kr/" target="_blank" class="missa-btn">
-          📅 이번 달 주요 전례 보기
-        </a>
-        <a href="https://missa.cbck.or.kr/Liturgy" target="_blank" class="missa-btn missa-btn-outline">
-          📋 연간 전례력 보기
-        </a>
-      </div>
-    </div>
   </aside>
 
   <main>
@@ -803,6 +803,22 @@
         <div class="lit-title" id="termTitle">절기를 계산하고 있습니다…</div>
         <div class="lit-date" id="termDate"></div>
         <div class="lit-sub" id="termMeaning"></div>
+      </div>
+
+      <div class="lit-month" id="litMonthCard">
+        <div class="section-title" style="color:#aab3cc;border-bottom-color:rgba(255,255,255,.15)">✝️ 월별 주요 전례</div>
+        <div class="missa-panel" style="padding:0;background:none;box-shadow:none">
+          <div class="missa-panel-header">
+            <span class="missa-logo">✠</span>
+            <div>
+              <div class="missa-title">한국천주교주교회의</div>
+              <div class="missa-sub">매일미사 · 월별 주요전례</div>
+            </div>
+          </div>
+          <div class="missa-month" id="missaMonthLabel"></div>
+          <a id="missaLink" href="https://missa.cbck.or.kr/" target="_blank" class="missa-btn">📅 이번 달 주요 전례 보기</a>
+          <a href="https://missa.cbck.or.kr/Liturgy" target="_blank" class="missa-btn missa-btn-outline">📋 연간 전례력 보기</a>
+        </div>
       </div>
 
       <a class="lit-card lit-grade" href="https://khmass-liturgy.github.io/mass/mass-grade-cards.html" target="_blank" rel="noopener">
