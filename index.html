@@ -327,6 +327,7 @@
     .church-footer { display: none; }
     .pope-prayer { display: none !important; }
     .parish-updates { display: none !important; }
+    .liturgy-cards { display: none !important; }
   }
   .footnote { font-size:11px; color:var(--gray); padding:12px 18px; border-top:1px solid var(--border); line-height:1.8; }
 
@@ -501,7 +502,15 @@
   .stat-chip-min { background:#1e40af; color:#fff; }
   .stat-chip:hover { opacity:0.8; }
   .assign-stats-warn { border-color:var(--red); background:#fdf1f1; }
-  .assign-stats-note { font-size:10px; color:var(--red); margin-top:6px; font-weight:700; line-height:1.4; }
+  .assign-issues { margin-top:8px; border-top:1px dashed var(--border); padding-top:6px; }
+  .assign-issues-title { font-weight:700; color:var(--red); margin-bottom:4px; }
+  .assign-issue { padding:5px 6px; border-radius:6px; cursor:pointer; line-height:1.5; }
+  .assign-issue:hover { background:#f5e9e9; }
+  .issue-tag { font-size:10px; padding:1px 6px; border-radius:8px; font-weight:700; color:#fff; white-space:nowrap; }
+  .issue-under { background:#1e40af; }
+  .issue-over  { background:var(--red); }
+  .issue-reasons { font-size:10px; color:#666; margin-top:2px; word-break:keep-all; }
+  .assign-stats-note {font-size:10px; color:var(--red); margin-top:6px; font-weight:700; line-height:1.4; }
 
   /* ── 역할 선택 (모달 내) ── */
   .role-tabs { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:14px; }
@@ -1569,12 +1578,100 @@ function getMinMaxAssignees() {
   };
 }
 
+// 현재 연/월의 미사 슬롯 목록 (저장된 배정이 있으면 그 슬롯, 없으면 기본 슬롯)
+function getMonthSlots() {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const list = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const slots = Array.isArray(scheduleData[ds]) && scheduleData[ds].length ? scheduleData[ds] : getDefaultSlots(ds);
+    slots.forEach(s => list.push({ day: d, ds, slot: s }));
+  }
+  return list;
+}
+function slotNames(s) {
+  return [s.haesul, s.dok1, s.dok2, ...(s.extraDoks || [])].filter(n => n && n !== '(미배정)');
+}
+
+// 배정 횟수가 설정 범위(최소~최대)를 벗어난 봉사자와 그 이유를 계산
+// 반환: [{ name, kind:'under'|'over', count, limit, reasons:[...] }]
+function getCountIssues() {
+  const counts = getAssignCounts();
+  if (!Object.values(counts).some(c => c > 0)) return [];   // 아직 배정 전
+  const monthSlots = getMonthSlots();
+  const totalPositions = Object.values(counts).reduce((a, b) => a + b, 0);
+  const dayNames = ['일','월','화','수','목','금','토'];
+  const issues = [];
+
+  members.forEach(m => {
+    const c = counts[m] || 0, lo = floorOf(m), hi = capOf(m);
+    const under = lo != null && c < lo;
+    const over  = hi != null && c > hi;
+    if (!under && !over) return;
+    const reasons = [];
+    const role = memberRoles[m] || 'both';
+
+    if (under) {
+      const avail = monthSlots.filter(x => canAssign(m, x.day, x.slot.time)).length;
+      const av = availability[m] || {};
+      const prefix = `${year}-${String(month).padStart(2,'0')}-`;
+      const okDays  = Object.entries(av).filter(([k, v]) => v === 'ok'  && k.startsWith(prefix)).length;
+      const offDays = Object.entries(av).filter(([k, v]) => v === 'off' && k.startsWith(prefix)).length;
+      const hasOk = Object.values(av).some(v => v === 'ok');
+      const toDows = Object.entries(timeOff[m] || {}).filter(([, t]) => t.length).map(([d]) => dayNames[d]);
+      const tnDows = Object.entries(timeOn[m]  || {}).filter(([, t]) => t.length).map(([d]) => dayNames[d]);
+      const dtoCnt = Object.keys(dateTimeOff[m] || {}).filter(k => k.startsWith(prefix)).length;
+
+      if (hi != null && hi < lo) reasons.push(`최대 ${hi}회가 최소 ${lo}회보다 낮게 설정됨`);
+      if (avail < lo) reasons.push(`참여 가능한 미사가 ${avail}회뿐 (전체 ${monthSlots.length}회 중)`);
+      if (hasOk) reasons.push(`가능일을 ${okDays}일만 지정함`);
+      if (offDays) reasons.push(`불가일 ${offDays}일`);
+      if (toDows.length) reasons.push(`${toDows.join('·')}요일 일부 시간대 불가`);
+      if (tnDows.length) reasons.push(`${tnDows.join('·')}요일은 지정한 시간대만 가능`);
+      if (dtoCnt) reasons.push(`특정 날짜·시간 불가 ${dtoCnt}건`);
+      if (role !== 'both') reasons.push(`역할이 '${role === 'haesul' ? '해설' : '독서'}'로 한정됨`);
+      const partners = avoidPairs.filter(([a, b]) => a === m || b === m).map(([a, b]) => a === m ? b : a);
+      if (partners.length) reasons.push(`함께 배정 제외: ${partners.join(', ')}`);
+      if (totalPositions < members.length * lo) reasons.push(`전체 배정 자리(${totalPositions}개)가 인원×최소(${members.length}×${lo})보다 부족`);
+      if (!reasons.length) reasons.push('배정 후 수동으로 바뀌었거나, 같은 미사·역할이 다른 사람과 겹쳐 밀림');
+    }
+
+    if (over) {
+      let forced = 0;
+      monthSlots.forEach(x => {
+        const names = slotNames(x.slot);
+        if (!names.includes(m)) return;
+        const alt = members.some(o => o !== m && !names.includes(o) && canAssign(o, x.day, x.slot.time) && (capOf(o) == null || (counts[o] || 0) < capOf(o)));
+        if (!alt) forced++;
+      });
+      if (forced) reasons.push(`${forced}개 미사는 대신할 수 있는 봉사자가 없어 배정됨 (다른 사람의 불가일·가능일·상한 때문)`);
+      if (lo != null && lo > hi) reasons.push(`최소 ${lo}회가 최대 ${hi}회보다 높게 설정됨`);
+      if (totalPositions > members.length * hi) reasons.push(`전체 배정 자리(${totalPositions}개)가 인원×최대(${members.length}×${hi})보다 많음`);
+      if (!reasons.length) reasons.push('배정 후 수동으로 바뀌었을 수 있음');
+    }
+
+    issues.push({ name: m, kind: under ? 'under' : 'over', count: c, limit: under ? lo : hi, reasons });
+  });
+  return issues;
+}
+
 // 최다/최소 배정 요약 패널 렌더링
 function renderAssignStats() {
   const el = document.getElementById('assignStats');
   if (!el) return;
   const { max, min, maxNames, minNames } = getMinMaxAssignees();
   if (max < 0) { el.innerHTML = ''; return; }
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const issues = getCountIssues();
+  const issueHtml = issues.length ? `
+      <div class="assign-issues">
+        <div class="assign-issues-title">⚠️ 설정 범위(${defaultMinCount ?? '–'}~${defaultMaxCount ?? '–'}회)를 벗어난 사람 ${issues.length}명</div>
+        ${issues.map(i => `
+        <div class="assign-issue" onclick="openAvail('${i.name.replace(/'/g,"\\'")}')" title="클릭 → ${esc(i.name)} 설정 열기">
+          <b>${esc(i.name)}</b> <span class="issue-tag issue-${i.kind}">${i.count}회 · ${i.kind === 'under' ? '최소 ' : '최대 '}${i.limit}회 ${i.kind === 'under' ? '미달' : '초과'}</span>
+          <div class="issue-reasons">${i.reasons.map(r => '· ' + esc(r)).join('<br>')}</div>
+        </div>`).join('')}
+      </div>` : '';
 
   const gap = max - min;
   const gapWarn = gap >= 3;
@@ -1594,6 +1691,7 @@ function renderAssignStats() {
         <div class="assign-stats-names">${nameChips(minNames, 'min')}</div>
       </div>
       ${gapWarn ? `<div class="assign-stats-note">⚠️ 최다·최소 격차 ${gap}회 — 편중이 큽니다. 이름을 눌러 가능일을 조정해보세요.</div>` : ''}
+      ${issueHtml}
     </div>`;
 }
 
@@ -2751,16 +2849,15 @@ function autoAssign() {
     if (max - min >= 3) msg += `\n\n⚠️ 격차가 ${max-min}회로 큽니다. 좌측 목록에서 확인해보세요.`;
   }
   // 설정한 배정 횟수 범위를 벗어난 봉사자 안내 (가능일이 적거나 전체 슬롯 수가 부족/과다한 경우)
-  const finalCounts = getAssignCounts();
-  const under = [], over = [];
-  members.forEach(m => {
-    const lo = floorOf(m), hi = capOf(m), c = finalCounts[m] || 0;
-    if (lo != null && c < lo) under.push(`${m}(${c}회)`);
-    if (hi != null && c > hi) over.push(`${m}(${c}회)`);
-  });
-  if (under.length) msg += `\n\n⚠️ 최소 ${defaultMinCount ?? '개별'}회 미달: ${under.join(', ')}`;
-  if (over.length)  msg += `\n⚠️ 최대 초과: ${over.join(', ')}`;
-  if (under.length || over.length) msg += '\n(가능일 제한이나 전체 미사 수 때문일 수 있습니다. 범위를 조정해보세요.)';
+  const issues = getCountIssues();
+  if (issues.length) {
+    msg += `\n\n⚠️ 설정 범위를 벗어난 사람 ${issues.length}명:`;
+    issues.slice(0, 8).forEach(i => {
+      msg += `\n• ${i.name} ${i.count}회 (${i.kind === 'under' ? '최소 ' + i.limit + '회 미달' : '최대 ' + i.limit + '회 초과'}) — ${i.reasons[0]}`;
+    });
+    if (issues.length > 8) msg += `\n… 외 ${issues.length - 8}명`;
+    msg += '\n\n자세한 이유는 좌측 배정 요약에서 확인하세요.';
+  }
   alert(msg);
 }
 
