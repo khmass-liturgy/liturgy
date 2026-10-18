@@ -571,7 +571,7 @@
     </div>
 
     <div>
-      <div class="section-title">👥 봉사자 명단</div>
+      <div class="section-title">👥 봉사자 명단 <span id="memberTotal" style="color:var(--navy);letter-spacing:0;text-transform:none;font-size:12px"></span></div>
       <p style="font-size:11px;color:var(--gray);margin-bottom:8px" id="memberHint">이름 클릭 → 역할 수정 · 가능일/불가일 설정</p>
       <div class="member-add">
         <input type="text" id="newMember" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addMember()" style="flex:1">
@@ -1990,6 +1990,14 @@ function renderMemberList() {
   el.innerHTML = '';
   const counts = getAssignCounts();
   const { max, min, maxNames, minNames } = getMinMaxAssignees();
+  const totalEl = document.getElementById('memberTotal');
+  if (totalEl) {
+    const roleOf2 = n => memberRoles[n] || 'both';
+    const h = members.filter(n => roleOf2(n) !== 'dok').length;
+    const d = members.filter(n => roleOf2(n) !== 'haesul').length;
+    totalEl.textContent = `총 ${members.length}명 · 해설 ${h} · 독서 ${d}`;
+    totalEl.title = `해설 가능 ${h}명, 독서 가능 ${d}명 (양쪽 가능자는 두 쪽에 모두 포함)`;
+  }
   members.forEach((m, i) => {
     const s = getAvailSummary(m);
     const r = getRoleInfo(m);
