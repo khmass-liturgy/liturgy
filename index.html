@@ -1611,6 +1611,7 @@ function getCountIssues() {
   const dokSeats = monthSlots.reduce((a, x) => a + 1 + (x.slot.dok2 !== null && x.slot.dok2 !== undefined ? 1 : 0) + (x.slot.extraDoks || []).length, 0);
   const seatPerHaesul = haesulPool.length ? haesulSeats / haesulPool.length : Infinity;
   const seatPerDok    = dokPool.length ? dokSeats / dokPool.length : Infinity;
+  const haesulShort = defaultMaxCount != null && seatPerHaesul > defaultMaxCount;
   const roleSupplyReason = (m, hi, lo) => {
     const out = [];
     const r = roleOf(m);
@@ -1627,7 +1628,9 @@ function getCountIssues() {
   members.forEach(m => {
     const c = counts[m] || 0, lo = floorOf(m), hi = capOf(m);
     const under = lo != null && c < lo;
-    const over  = hi != null && c > hi;
+    let over    = hi != null && c > hi;
+    // 해설 가능 인원이 적어 해설 자리를 나눠 맡을 수밖에 없는 경우: 초과는 불가피하므로 경고에서 제외
+    if (over && haesulShort && haesulPool.includes(m) && c <= Math.ceil(seatPerHaesul) + 1) over = false;
     if (!under && !over) return;
     const reasons = [];
     const role = memberRoles[m] || 'both';
@@ -1680,6 +1683,10 @@ function getCountIssues() {
 
     issues.push({ name: m, kind: under ? 'under' : 'over', count: c, limit: under ? lo : hi, reasons });
   });
+  if (haesulShort) {
+    const need = Math.ceil(haesulSeats / defaultMaxCount);
+    issues.info = `해설 가능 인원 ${haesulPool.length}명 · 해설 자리 ${haesulSeats}개 → 해설 담당은 평균 ${seatPerHaesul.toFixed(1)}회로 많을 수밖에 없어 경고에서 제외했습니다. (최대 ${defaultMaxCount}회 이내로 하려면 해설 가능 인원 ${need}명 이상 필요)`;
+  }
   return issues;
 }
 
@@ -1691,7 +1698,8 @@ function renderAssignStats() {
   if (max < 0) { el.innerHTML = ''; return; }
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const issues = getCountIssues();
-  const issueHtml = issues.length ? `
+  const infoHtml = issues.info ? `<div class="assign-stats-note" style="color:#1e40af">ℹ️ ${esc(issues.info)}</div>` : '';
+  const issueHtml = infoHtml + (issues.length ? `
       <div class="assign-issues">
         <div class="assign-issues-title">⚠️ 설정 범위(${defaultMinCount ?? '–'}~${defaultMaxCount ?? '–'}회)를 벗어난 사람 ${issues.length}명</div>
         ${issues.map(i => `
@@ -1699,7 +1707,7 @@ function renderAssignStats() {
           <b>${esc(i.name)}</b> <span class="issue-tag issue-${i.kind}">${i.count}회 · ${i.kind === 'under' ? '최소 ' : '최대 '}${i.limit}회 ${i.kind === 'under' ? '미달' : '초과'}</span>
           <div class="issue-reasons">${i.reasons.map(r => '· ' + esc(r)).join('<br>')}</div>
         </div>`).join('')}
-      </div>` : '';
+      </div>` : '');
 
   const gap = max - min;
   const gapWarn = gap >= 3;
@@ -2809,6 +2817,7 @@ function autoAssign() {
   if (!dokMembers.length)    dokMembers.push(...members);
 
   let ptrs = { haesul:0, dok1:0, dok2:0 };
+  const plan = [];
 
   // 이번 실행에서의 봉사자별 배정 횟수 (월 최대 횟수 상한 판단용)
   const runCounts = {};
@@ -2856,13 +2865,21 @@ function autoAssign() {
     const prevExtraByTime = {};
     prevSlots.forEach(s => { if (s.extraDoks && s.extraDoks.length) prevExtraByTime[s.time] = s.extraDoks; });
 
-    scheduleData[dateStr] = defaultSlots.map(s => {
-      const h  = pick('haesul', d, [], s.time);
-      const d1 = pick('dok1',   d, [h], s.time);
-      const d2 = (s.dok2 === null) ? null : pick('dok2', d, [h, d1], s.time);
-      return { time: s.time, note: s.note, haesul: h, dok1: d1, dok2: d2, extraDoks: prevExtraByTime[s.time] || [] };
-    });
+    plan.push({ d, dateStr, slots: defaultSlots.map(s => ({
+      time: s.time, note: s.note, haesul: '', dok1: '', dok2: (s.dok2 === null) ? null : '',
+      extraDoks: prevExtraByTime[s.time] || []
+    })) });
   }
+
+  // 1단계: 해설 전체를 먼저 배정 — 해설 가능 인원은 적고 독서 가능 인원은 많으므로,
+  // 해설 가능자가 독서 자리까지 떠맡아 횟수가 몰리지 않게 해설 몫을 먼저 확정한다.
+  plan.forEach(p => p.slots.forEach(s => { s.haesul = pick('haesul', p.d, [], s.time); }));
+  // 2단계: 독서 배정 — 이미 해설을 맡아 횟수가 쌓인 사람보다 독서 전용 인원이 먼저 채워진다.
+  plan.forEach(p => p.slots.forEach(s => {
+    s.dok1 = pick('dok1', p.d, [s.haesul], s.time);
+    if (s.dok2 !== null) s.dok2 = pick('dok2', p.d, [s.haesul, s.dok1], s.time);
+  }));
+  plan.forEach(p => { scheduleData[p.dateStr] = p.slots; });
 
   for (let d = 1; d <= daysInMonth; d++) {
     renderCellSlots(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
