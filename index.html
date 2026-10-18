@@ -3064,38 +3064,43 @@ function autoAssign() {
   if (!haesulMembers.length) haesulMembers.push(...members);
   if (!dokMembers.length)    dokMembers.push(...members);
 
-  let ptrs = { haesul:0, dok1:0, dok2:0 };
   const plan = [];
 
   // 이번 실행에서의 봉사자별 배정 횟수 (월 최대 횟수 상한 판단용)
   const runCounts = {};
   members.forEach(m => runCounts[m] = 0);
   const underCap = m => { const c = capOf(m); return c == null || runCounts[m] < c; };
+  const runDays = {};   // 봉사자별 배정된 날짜(일) 집합 — 연속일 배정을 피하는 데 사용
+  const isAdjacentDay = (m, day) => { const st = runDays[m]; return !!st && (st.has(day) || st.has(day - 1) || st.has(day + 1)); };
 
   function pick(role, day, used, time) {
     const pool = (role==='haesul') ? haesulMembers : dokMembers;
-    const ptr  = (role==='haesul') ? 'haesul' : role;
     const tiers = [
       m => canAssign(m, day, time) && !used.includes(m) && !hasConflict(m, used), // 가능일 + 조합충돌 없음
       m => canAssign(m, day, time) && !used.includes(m),                          // 가능일
       m => canAssign(m, day, time)                                                // 중복 허용
     ];
     // 먼저 최대 횟수를 지키는 범위에서 찾고, 사람이 없으면 상한을 넘겨서라도 채운다.
-    // 조건을 만족하는 후보 중에서는 지금까지 횟수가 가장 적은 사람을 고르고(동률이면 순환 순서),
-    // 이렇게 해야 모두가 최소~최대 범위 안에 고르게 들어온다.
+    // 조건을 만족하는 후보 중에서는 지금까지 횟수가 가장 적은 사람 쪽에서 고르므로
+    // 모두가 최소~최대 범위 안에 고르게 들어온다.
     for (const respectCap of [true, false]) {
       for (const ok of tiers) {
-        let best = -1, bestCount = Infinity;
+        // 횟수가 가장 적은 후보들 중에서 무작위로 고른다 (순환 순서로 정하면 매주 같은 요일·시간에 같은 사람이 고정됨).
+        // 가능하면 같은 날이나 바로 앞뒤 날에 이미 배정된 사람은 피한다.
+        let cands = [], bestCount = Infinity;
         for (let t = 0; t < pool.length; t++) {
-          const m = pool[(ptrs[ptr]+t) % pool.length];
-          if (ok(m) && (!respectCap || underCap(m)) && runCounts[m] < bestCount) {
-            best = t; bestCount = runCounts[m];
-          }
+          const m = pool[t];
+          if (!ok(m) || (respectCap && !underCap(m))) continue;
+          const c = runCounts[m];
+          if (c < bestCount) { bestCount = c; cands = [m]; }
+          else if (c === bestCount) cands.push(m);
         }
-        if (best >= 0) {
-          const m = pool[(ptrs[ptr]+best) % pool.length];
-          ptrs[ptr] = (ptrs[ptr]+best+1) % pool.length;
+        if (cands.length) {
+          const spaced = cands.filter(m => !isAdjacentDay(m, day));
+          const from = spaced.length ? spaced : cands;
+          const m = from[Math.floor(Math.random() * from.length)];
           runCounts[m]++;
+          (runDays[m] || (runDays[m] = new Set())).add(day);
           return m;
         }
       }
