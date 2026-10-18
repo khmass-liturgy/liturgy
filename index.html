@@ -272,7 +272,7 @@
   @media print {
     html, body { background: white; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    header, aside, #saveToast, .modal-overlay { display: none !important; }
+    header, aside, #saveToast, #fbGate, .modal-overlay { display: none !important; }
     .container { display: block; min-height: auto; }
     main { padding: 0; overflow: visible; }
     .schedule-wrapper {
@@ -532,6 +532,9 @@
   #saveToast.show { opacity:1; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -624,6 +627,21 @@
         <input type="file" id="importExcelFile" accept=".xlsx" onchange="importExcelAvailability(event)" style="display:none">
       </label>
       <button class="btn btn-outline" onclick="clearStorage()" style="margin-top:4px;color:var(--red);border-color:var(--red)">🗑️ 배정 데이터 초기화</button>
+    </div>
+
+    <div>
+      <div class="section-title">☁️ 클라우드 저장 (Firebase)</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">입력한 모든 내용(명단·역할·가능일·배정 결과·설정)이 구글 계정으로 로그인한 Firebase에 자동 저장되어, 어느 컴퓨터에서든 같은 데이터를 쓸 수 있습니다.</p>
+      <div id="fbUserRow" style="display:none">
+        <div id="fbUser" style="font-size:12px;font-weight:700;margin-bottom:6px;word-break:break-all"></div>
+        <button class="btn btn-outline" onclick="fbLogout()">로그아웃</button>
+      </div>
+      <div id="fbConflictRow" style="display:none;margin-top:6px;padding:8px;background:#fff3cd;border-radius:8px;font-size:11px;line-height:1.5">
+        <div id="fbConflictMsg" style="margin-bottom:6px"></div>
+        <button class="btn btn-primary" style="padding:6px;font-size:11px" onclick="fbConflictReload()">클라우드 내용 불러오기</button>
+        <button class="btn btn-outline" style="padding:6px;font-size:11px" onclick="fbConflictOverwrite()">이 기기 내용으로 덮어쓰기</button>
+      </div>
+      <p id="fbSync" style="font-size:11px;margin-top:6px;color:var(--gray)"></p>
     </div>
 
     <div>
@@ -856,6 +874,18 @@
       <button class="btn btn-outline" onclick="closeAvail()">닫기</button>
       <button class="btn btn-primary" onclick="closeAvail()">확인</button>
     </div>
+  </div>
+</div>
+
+<!-- 구글 로그인 화면: 로그인하기 전에는 앱 내용을 가린다 -->
+<div id="fbGate" style="position:fixed;inset:0;z-index:2000;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:14px;padding:28px 24px;width:360px;max-width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="font-size:30px;color:var(--gold)">✠</div>
+    <h2 style="font-family:'Noto Serif KR',serif;font-size:18px;margin:6px 0 4px">교하성당 전례단 시간표 작성기</h2>
+    <p style="font-size:12px;color:var(--gray);margin-bottom:16px">구글 계정으로 로그인하면 저장된 데이터가 불러와집니다.</p>
+    <button class="btn btn-primary" id="fbGateBtn" onclick="fbGoogleLogin()" disabled>🔐 Google 계정으로 로그인</button>
+    <p id="fbGateMsg" style="font-size:12px;margin-top:12px;color:var(--gray);line-height:1.6">로그인 상태를 확인하는 중…</p>
+    <button class="btn btn-outline" id="fbGateLocalBtn" style="display:none" onclick="fbUseLocalOnly()">클라우드 없이 이 브라우저에서만 사용</button>
   </div>
 </div>
 
@@ -1140,6 +1170,13 @@ let memberMinCount = {};
 let memberMaxCount = {};
 let defaultMinCount = 5;
 let defaultMaxCount = 7;
+
+// ── Firebase 클라우드 저장 상태 (saveData보다 먼저 선언되어야 함) ──
+let fbDB = null, fbReady = false;
+let fbSaveTimer = null, fbLoadingFromCloud = false;
+let fbCloudLoaded = false;      // 클라우드를 한 번이라도 성공적으로 읽었는가 (읽기 전에는 절대 쓰지 않는다)
+let fbBaseline = null;          // 마지막으로 읽거나 쓴 savedAt — 다른 기기의 저장과 충돌 감지용
+let fbWatching = false;
 let scheduleData  = {};
 let editingDate   = null;
 let availMember   = null;
@@ -1215,6 +1252,10 @@ function saveData() {
     localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
     showSaveToast();
   } catch(e) { console.warn('저장 실패:', e); }
+  scheduleCloudSave();
+}
+function snapshotData() {
+  return { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
 }
 function loadData() {
   try {
@@ -1486,6 +1527,213 @@ function clearStorage() {
   renderMemberList(); renderCalendar();
   alert('초기화 완료 (봉사자 명단은 유지됨)');
 }
+
+/* ════════════════════ Firebase 클라우드 저장 + 구글 로그인 ════════════════════ */
+// 모든 데이터를 Realtime Database(khmass-jeonrye)의 jeonrye/liturgy 에 저장한다.
+// (apiKey는 비밀번호가 아니라 프로젝트 식별용 값이라 코드에 있어도 안전하다. 실제 보안은 구글 로그인과
+//  Firebase 보안 규칙이 담당한다.)
+const FB_CONFIG = {
+  apiKey: "AIzaSyB_XOy_6SqlWptnDRlX7oGESTyjqW2dN3A",
+  authDomain: "khmass-jeonrye.firebaseapp.com",
+  databaseURL: "https://khmass-jeonrye-default-rtdb.firebaseio.com",
+  projectId: "khmass-jeonrye",
+  storageBucket: "khmass-jeonrye.firebasestorage.app",
+  messagingSenderId: "498800750143",
+  appId: "1:498800750143:web:2d120177e6539b686b128a"
+};
+const FB_PATH = 'jeonrye/liturgy';
+// 이 화면에 들어올 수 있는 구글 계정. 실제 읽기/쓰기 권한은 Firebase 보안 규칙이 서버에서 한 번 더 막는다.
+const FB_ALLOWED_EMAILS = ['trsumun@gmail.com'];
+const FB_BASELINE_KEY = 'liturgy_fb_baseline';
+
+function fbSetSync(msg, color) {
+  const el = document.getElementById('fbSync');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--gray)'; }
+}
+function fbGateMsg(msg, isErr) {
+  const el = document.getElementById('fbGateMsg');
+  if (el) { el.textContent = msg; el.style.color = isErr ? 'var(--red)' : 'var(--gray)'; }
+}
+function initFirebase() {
+  if (typeof firebase === 'undefined') {
+    fbGateMsg('❌ Firebase를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.', true);
+    return;
+  }
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    fbDB = firebase.database();
+    fbReady = true;
+    firebase.auth().onAuthStateChanged(onFbAuthChange);
+  } catch (e) { fbGateMsg('❌ 초기화 실패: ' + e.message, true); }
+}
+async function fbGoogleLogin() {
+  if (!fbReady) return;
+  fbGateMsg('로그인 중…');
+  try {
+    await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  } catch (e) {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') fbGateMsg('로그인이 취소되었습니다.');
+    else fbGateMsg('❌ 로그인 실패: ' + e.message, true);
+  }
+}
+async function fbLogout() {
+  if (fbSaveTimer) await cloudSaveNow();
+  try { localStorage.removeItem('liturgySchedule_members'); localStorage.removeItem(FB_BASELINE_KEY); } catch (e) {}
+  await firebase.auth().signOut();
+  location.reload();   // 이 기기에 명단 등 데이터를 남기지 않는다
+}
+function onFbAuthChange(user) {
+  const gate = document.getElementById('fbGate');
+  const btn = document.getElementById('fbGateBtn');
+  if (!user) {
+    gate.style.display = 'flex'; btn.disabled = false;
+    fbGateMsg('구글 계정으로 로그인해 주세요.');
+    fbStopWatch(); fbCloudLoaded = false;
+    return;
+  }
+  if (!FB_ALLOWED_EMAILS.includes(user.email)) {
+    gate.style.display = 'flex'; btn.disabled = false;
+    fbGateMsg('❌ ' + user.email + ' 계정은 접근 권한이 없습니다. 다른 계정으로 로그인해 주세요.', true);
+    firebase.auth().signOut();
+    return;
+  }
+  document.getElementById('fbUserRow').style.display = '';
+  document.getElementById('fbUser').textContent = '👤 ' + user.email;
+  fbGateMsg('데이터를 불러오는 중…');
+  cloudLoad().then(ok => { if (ok) gate.style.display = 'none'; });
+}
+function fbUseLocalOnly() {
+  // 클라우드 읽기에 실패한 상태에서는 쓰기를 막아 둔 채(fbCloudLoaded=false) 이 브라우저 저장만 쓴다
+  document.getElementById('fbGate').style.display = 'none';
+  fbSetSync('⚠ 클라우드 연결 안 됨 — 이 브라우저에만 저장 중', '#856404');
+}
+function hasLocalWork() {
+  return [scheduleData, availability, timeOff, timeOn, dateTimeOff].some(o => o && Object.keys(o).length) || avoidPairs.length > 0;
+}
+function applyLoadedData(data) {
+  fbLoadingFromCloud = true;
+  try {
+    members = data.members || members;
+    memberRoles = data.memberRoles || {};
+    availability = data.availability || {};
+    timeOff = data.timeOff || {};
+    timeOn = data.timeOn || {};
+    dateTimeOff = data.dateTimeOff || {};
+    avoidPairs = data.avoidPairs || [];
+    memberMinCount = data.memberMinCount || {};
+    memberMaxCount = data.memberMaxCount || {};
+    if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
+    if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
+    scheduleData = data.scheduleData || {};
+    if (data.year && data.month) { year = data.year; month = data.month; }
+    document.getElementById('yearInput').value  = year;
+    document.getElementById('monthInput').value = month;
+    document.getElementById('defaultMinCount').value = defaultMinCount ?? '';
+    document.getElementById('defaultMaxCount').value = defaultMaxCount ?? '';
+    renderMemberList();
+    renderCalendar();
+    try { localStorage.setItem('liturgySchedule_members', JSON.stringify(snapshotData())); } catch (e) {}
+  } finally { fbLoadingFromCloud = false; }
+}
+async function cloudLoad() {
+  if (!fbDB || !firebase.auth().currentUser) return false;
+  fbSetSync('불러오는 중…');
+  try {
+    const snap = await fbDB.ref(FB_PATH).get();
+    if (snap.exists()) {
+      const rec = snap.val();
+      const localBase = (() => { try { return localStorage.getItem(FB_BASELINE_KEY); } catch (e) { return null; } })();
+      // 이 기기에만 있는 작업 내용이 있고 클라우드와 갈라졌다면 어느 쪽을 쓸지 묻는다
+      if (hasLocalWork() && localBase !== rec.savedAt &&
+          !confirm('이 기기에 저장된 내용과 클라우드 내용이 다릅니다.\n\n[확인] 클라우드 내용을 불러옵니다 (이 기기 내용은 대체됨)\n[취소] 이 기기 내용을 클라우드에 올립니다')) {
+        fbCloudLoaded = true; fbBaseline = rec.savedAt || null;
+        await cloudSaveNow(true);
+        fbStartWatch();
+        return true;
+      }
+      applyLoadedData(JSON.parse(rec.json));
+      fbBaseline = rec.savedAt || null; fbCloudLoaded = true;
+      try { localStorage.setItem(FB_BASELINE_KEY, fbBaseline || ''); } catch (e) {}
+      fbHideConflict();
+      const t = rec.savedAt ? new Date(rec.savedAt).toLocaleString('ko-KR') : '';
+      fbSetSync('✅ 동기화됨' + (t ? ' (' + t + ')' : ''), '#1a7a4a');
+    } else {
+      // 클라우드가 비어 있으면 이 기기의 현재 데이터를 처음으로 올린다
+      fbBaseline = null; fbCloudLoaded = true;
+      fbSetSync('새 저장소 — 현재 내용을 클라우드에 올립니다', 'var(--gray)');
+      await cloudSaveNow(true);
+    }
+    fbStartWatch();
+    return true;
+  } catch (e) {
+    fbGateMsg('❌ ' + (e.code === 'PERMISSION_DENIED' ? '권한 없음 — Firebase 보안 규칙에서 jeonrye/liturgy 를 허용해야 합니다.' : e.message), true);
+    fbSetSync('❌ 불러오기 실패', 'var(--red)');
+    document.getElementById('fbGate').style.display = 'flex';
+    document.getElementById('fbGateLocalBtn').style.display = '';
+    return false;
+  }
+}
+function scheduleCloudSave() {
+  if (fbLoadingFromCloud || !fbDB || !firebase.auth().currentUser) return;
+  if (!fbCloudLoaded) { fbSetSync('⚠ 저장 보류 — 클라우드를 읽지 못했습니다. 새로고침 후 다시 시도하세요.', '#856404'); return; }
+  fbSetSync('저장 대기…');
+  clearTimeout(fbSaveTimer);
+  fbSaveTimer = setTimeout(() => cloudSaveNow(), 1500);
+}
+async function cloudSaveNow(force) {
+  clearTimeout(fbSaveTimer); fbSaveTimer = null;
+  if (!fbDB || !firebase.auth().currentUser || !fbCloudLoaded) return;
+  fbSetSync('저장 중…');
+  const prev = fbBaseline;
+  try {
+    // 읽어온 뒤 다른 기기가 저장했는지 확인한다. 확인 없이 쓰면 마지막 저장자가 상대 수정을 지워 버린다.
+    if (force !== true && fbBaseline !== null) {
+      const rs = await fbDB.ref(FB_PATH + '/savedAt').get();
+      const remote = rs.exists() ? rs.val() : null;
+      if (remote && remote !== fbBaseline) { fbShowConflict(remote); return; }
+    }
+    const stamp = new Date().toISOString();
+    fbBaseline = stamp;   // 감시 리스너가 내 저장을 충돌로 오인하지 않도록 먼저 갱신
+    // 배열/null(dok2 없음)이 Firebase에서 사라지지 않도록 JSON 문자열 한 덩어리로 저장한다
+    await fbDB.ref(FB_PATH).set({ json: JSON.stringify(snapshotData()), savedAt: stamp, savedBy: firebase.auth().currentUser.email });
+    try { localStorage.setItem(FB_BASELINE_KEY, stamp); } catch (e) {}
+    fbHideConflict();
+    fbSetSync('✅ 자동 저장됨 ' + new Date().toLocaleTimeString('ko-KR'), '#1a7a4a');
+  } catch (e) {
+    fbBaseline = prev;
+    fbSetSync('❌ 저장 실패: ' + (e.code === 'PERMISSION_DENIED' ? '권한 없음 (보안 규칙 확인)' : e.message), 'var(--red)');
+  }
+}
+function fbShowConflict(remoteStamp) {
+  const t = remoteStamp ? new Date(remoteStamp).toLocaleString('ko-KR') : '';
+  document.getElementById('fbConflictMsg').textContent = '⚠ 다른 기기에서 저장한 내용이 있습니다' + (t ? ' (' + t + ')' : '') + '. 자동 저장을 멈췄습니다.';
+  document.getElementById('fbConflictRow').style.display = '';
+  fbSetSync('⚠ 저장 보류 — 충돌 확인 필요', '#856404');
+}
+function fbHideConflict() { const r = document.getElementById('fbConflictRow'); if (r) r.style.display = 'none'; }
+async function fbConflictReload() { fbHideConflict(); await cloudLoad(); }
+async function fbConflictOverwrite() {
+  if (!confirm('다른 기기에서 저장한 내용을 지우고 이 기기의 내용으로 덮어씁니다.\n계속할까요?')) return;
+  fbHideConflict();
+  await cloudSaveNow(true);
+}
+// 다른 기기의 저장을 실시간으로 감지해 충돌 전에 알린다
+function fbStartWatch() {
+  if (!fbDB || fbWatching) return;
+  fbWatching = true;
+  fbDB.ref(FB_PATH + '/savedAt').on('value', snap => {
+    const remote = snap.val();
+    if (!remote || fbBaseline === null || remote === fbBaseline) return;
+    fbShowConflict(remote);
+  });
+}
+function fbStopWatch() {
+  if (!fbDB || !fbWatching) return;
+  fbWatching = false;
+  try { fbDB.ref(FB_PATH + '/savedAt').off(); } catch (e) {}
+}
+window.addEventListener('pagehide', () => { if (fbSaveTimer) cloudSaveNow(); });
+window.addEventListener('load', initFirebase);
 
 // INIT
 loadData();
