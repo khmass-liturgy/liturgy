@@ -620,6 +620,14 @@
     <div>
       <div class="section-title">🎲 자동 배정</div>
       <p style="font-size:11px;color:var(--gray);margin-bottom:7px">설정된 가능일/불가일을 반영해 순환 배정합니다</p>
+      <label style="font-size:11px">1인 월 배정 횟수 범위 <span style="color:var(--gray);font-weight:400">(비우면 제한 없음)</span></label>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <input type="number" id="defaultMinCount" min="0" max="60" placeholder="최소" oninput="setDefaultCount('min', this.value)">
+        <span>~</span>
+        <input type="number" id="defaultMaxCount" min="1" max="60" placeholder="최대" oninput="setDefaultCount('max', this.value)">
+        <span style="font-size:12px">회</span>
+      </div>
+      <p style="font-size:10px;color:var(--gray);margin-bottom:7px">봉사자별 개별 범위는 이름을 눌러 설정합니다. 가능일 때문에 범위를 지킬 수 없는 경우에는 배정 후 알려드립니다.</p>
       <button class="btn btn-gold" onclick="autoAssign()">자동 배정 실행</button>
       <button class="btn btn-outline" onclick="clearAll()">전체 초기화</button>
     </div>
@@ -777,8 +785,19 @@
       </div>
     </div>
 
+    <!-- 월 최대 배정 횟수 -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gray);text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)">월 배정 횟수 범위 (비우면 공통 설정)</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="number" id="memberMinCount" min="0" max="60" placeholder="최소" oninput="setMemberCount('min', this.value)">
+        <span>~</span>
+        <input type="number" id="memberMaxCount" min="1" max="60" placeholder="최대" oninput="setMemberCount('max', this.value)">
+        <span style="font-size:12px">회</span>
+      </div>
+    </div>
+
     <div class="avail-tabs">
-      <button class="avail-tab" id="tabOk"    onclick="setMode('ok')">✅ 가능한 날</button>
+      <button class="avail-tab" id="tabOk"   onclick="setMode('ok')">✅ 가능한 날</button>
       <button class="avail-tab" id="tabOff"   onclick="setMode('off')">❌ 안되는 날</button>
       <button class="avail-tab" id="tabClear" onclick="setMode('clear')">🔄 지정 취소</button>
     </div>
@@ -1107,6 +1126,11 @@ let timeOn  = {};   // 시간대별 가능 설정: timeOn[name][dow] = ['HH:MM',
 let dateTimeOff = {};
 // avoidPairs = [['이름A','이름B'], ...]  같은 미사에 함께 배정하면 안 되는 조합
 let avoidPairs = [];
+// 월 배정 횟수 범위: 개별(memberMinCount/memberMaxCount[name]) 값이 없으면 공통값(기본 5~7회, null이면 제한 없음)
+let memberMinCount = {};
+let memberMaxCount = {};
+let defaultMinCount = 5;
+let defaultMaxCount = 7;
 let scheduleData  = {};
 let editingDate   = null;
 let availMember   = null;
@@ -1178,7 +1202,7 @@ const KYOHA_FALLBACK = {
 // ── 로컬스토리지 저장/불러오기 ──
 function saveData() {
   try {
-    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, scheduleData };
+    const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
     localStorage.setItem('liturgySchedule_members', JSON.stringify(data));
     showSaveToast();
   } catch(e) { console.warn('저장 실패:', e); }
@@ -1195,6 +1219,10 @@ function loadData() {
     if (data.timeOn)       timeOn       = data.timeOn;
     if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
     if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
+    if (data.memberMinCount) memberMinCount = data.memberMinCount;
+    if (data.memberMaxCount) memberMaxCount = data.memberMaxCount;
+    if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
+    if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
     if (data.scheduleData) scheduleData = data.scheduleData;
     // 저장된 연월 복원 (구버전 데이터는 scheduleData 키에서 자동 감지)
     if (data.year && data.month) {
@@ -1215,8 +1243,8 @@ function showSaveToast() {
   t._timer = setTimeout(() => t.classList.remove('show'), 1800);
 }
 function exportData() {
-  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, scheduleData };
-  const json = JSON.stringify(data, null, 2);
+  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, scheduleData };
+  const json =JSON.stringify(data, null, 2);
   const d = new Date();
   const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
   // UTF-8 바이트 → base64 (한글 포함 안전 처리)
@@ -1245,6 +1273,10 @@ function importData(event) {
       if (data.timeOn)       timeOn       = data.timeOn;
       if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
       if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
+      if (data.memberMinCount) memberMinCount = data.memberMinCount;
+      if (data.memberMaxCount) memberMaxCount = data.memberMaxCount;
+      if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
+      if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
       if (data.scheduleData) scheduleData = data.scheduleData;
       // 연월 복원: 명시된 값 우선, 없으면 scheduleData 키에서 자동 감지 (구버전 호환)
       if (data.year && data.month) {
@@ -1450,8 +1482,29 @@ function clearStorage() {
 loadData();
 document.getElementById('yearInput').value  = year;
 document.getElementById('monthInput').value = month;
+document.getElementById('defaultMinCount').value = defaultMinCount ?? '';
+document.getElementById('defaultMaxCount').value = defaultMaxCount ?? '';
 renderMemberList();
 renderCalendar();
+
+// ── 월 최대 배정 횟수 ──
+function parseCap(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function setDefaultCount(kind, v) {
+  const n = parseCap(v);
+  if (kind === 'min') defaultMinCount = n; else defaultMaxCount = n;
+  saveData();
+}
+function setMemberCount(kind, v) {
+  if (!availMember) return;
+  const n = parseCap(v);
+  const map = kind === 'min' ? memberMinCount : memberMaxCount;
+  if (n === null) delete map[availMember]; else map[availMember] = n;
+}
+function capOf(name) { return memberMaxCount[name] ?? defaultMaxCount; }
+function floorOf(name) { return memberMinCount[name] ?? defaultMinCount; }
 
 // ── TIME SLOTS (모달 내 미사 추가용 폴백) ──
 function addTimeSlot() { timeSlots.push(''); }
@@ -1652,6 +1705,10 @@ function saveMemberEdit() {
     availability[newName] = availability[editingMemberName];
     timeOff[newName]      = timeOff[editingMemberName];
     timeOn[newName]       = timeOn[editingMemberName];
+    if (memberMinCount[editingMemberName] != null) memberMinCount[newName] = memberMinCount[editingMemberName];
+    if (memberMaxCount[editingMemberName] != null) memberMaxCount[newName] = memberMaxCount[editingMemberName];
+    delete memberMinCount[editingMemberName];
+    delete memberMaxCount[editingMemberName];
     delete memberRoles[editingMemberName];
     delete availability[editingMemberName];
     delete timeOff[editingMemberName];
@@ -1695,6 +1752,8 @@ function deleteMember(i) {
   delete timeOff[name];
   delete timeOn[name];
   delete dateTimeOff[name];
+  delete memberMinCount[name];
+  delete memberMaxCount[name];
   avoidPairs = avoidPairs.filter(([a,b]) => a !== name && b !== name);
   renderMemberList();
   saveData();
@@ -1755,6 +1814,8 @@ function openAvail(name) {
   availMember = name;
   availMode   = 'off';
   document.getElementById('availName').textContent = `👤 ${name}`;
+  document.getElementById('memberMinCount').value = memberMinCount[name] ?? '';
+  document.getElementById('memberMaxCount').value = memberMaxCount[name] ?? '';
   document.getElementById('availOverlay').classList.add('open');
   updateModeTabs();
   updateRoleTabs();
@@ -2623,25 +2684,38 @@ function autoAssign() {
 
   let ptrs = { haesul:0, dok1:0, dok2:0 };
 
+  // 이번 실행에서의 봉사자별 배정 횟수 (월 최대 횟수 상한 판단용)
+  const runCounts = {};
+  members.forEach(m => runCounts[m] = 0);
+  const underCap = m => { const c = capOf(m); return c == null || runCounts[m] < c; };
+
   function pick(role, day, used, time) {
     const pool = (role==='haesul') ? haesulMembers : dokMembers;
     const ptr  = (role==='haesul') ? 'haesul' : role;
-    // 1순위: 가능일 + 조합충돌 없음
-    for (let t = 0; t < pool.length; t++) {
-      const m = pool[(ptrs[ptr]+t) % pool.length];
-      if (canAssign(m, day, time) && !used.includes(m) && !hasConflict(m, used)) {
-        ptrs[ptr] = (ptrs[ptr]+t+1) % pool.length;
-        return m;
+    const tiers = [
+      m => canAssign(m, day, time) && !used.includes(m) && !hasConflict(m, used), // 가능일 + 조합충돌 없음
+      m => canAssign(m, day, time) && !used.includes(m),                          // 가능일
+      m => canAssign(m, day, time)                                                // 중복 허용
+    ];
+    // 먼저 최대 횟수를 지키는 범위에서 찾고, 사람이 없으면 상한을 넘겨서라도 채운다.
+    // 조건을 만족하는 후보 중에서는 지금까지 횟수가 가장 적은 사람을 고르고(동률이면 순환 순서),
+    // 이렇게 해야 모두가 최소~최대 범위 안에 고르게 들어온다.
+    for (const respectCap of [true, false]) {
+      for (const ok of tiers) {
+        let best = -1, bestCount = Infinity;
+        for (let t = 0; t < pool.length; t++) {
+          const m = pool[(ptrs[ptr]+t) % pool.length];
+          if (ok(m) && (!respectCap || underCap(m)) && runCounts[m] < bestCount) {
+            best = t; bestCount = runCounts[m];
+          }
+        }
+        if (best >= 0) {
+          const m = pool[(ptrs[ptr]+best) % pool.length];
+          ptrs[ptr] = (ptrs[ptr]+best+1) % pool.length;
+          runCounts[m]++;
+          return m;
+        }
       }
-    }
-    // 2순위: 가능일이면 배정 (조합충돌 있어도 완전 미배정보다는 낫지만, 충돌 없는 쪽 우선 이미 위에서 시도함)
-    for (let t = 0; t < pool.length; t++) {
-      const m = pool[(ptrs[ptr]+t) % pool.length];
-      if (canAssign(m, day, time) && !used.includes(m)) { ptrs[ptr]=(ptrs[ptr]+t+1)%pool.length; return m; }
-    }
-    for (let t = 0; t < pool.length; t++) {
-      const m = pool[(ptrs[ptr]+t) % pool.length];
-      if (canAssign(m, day, time)) { ptrs[ptr]=(ptrs[ptr]+t+1)%pool.length; return m; }
     }
     return '(미배정)';
   }
@@ -2676,6 +2750,17 @@ function autoAssign() {
     msg += `\n⬇ 최소 배정: ${minNames.join(', ')} (${min}회)`;
     if (max - min >= 3) msg += `\n\n⚠️ 격차가 ${max-min}회로 큽니다. 좌측 목록에서 확인해보세요.`;
   }
+  // 설정한 배정 횟수 범위를 벗어난 봉사자 안내 (가능일이 적거나 전체 슬롯 수가 부족/과다한 경우)
+  const finalCounts = getAssignCounts();
+  const under = [], over = [];
+  members.forEach(m => {
+    const lo = floorOf(m), hi = capOf(m), c = finalCounts[m] || 0;
+    if (lo != null && c < lo) under.push(`${m}(${c}회)`);
+    if (hi != null && c > hi) over.push(`${m}(${c}회)`);
+  });
+  if (under.length) msg += `\n\n⚠️ 최소 ${defaultMinCount ?? '개별'}회 미달: ${under.join(', ')}`;
+  if (over.length)  msg += `\n⚠️ 최대 초과: ${over.join(', ')}`;
+  if (under.length || over.length) msg += '\n(가능일 제한이나 전체 미사 수 때문일 수 있습니다. 범위를 조정해보세요.)';
   alert(msg);
 }
 
