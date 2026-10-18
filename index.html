@@ -1603,6 +1603,27 @@ function getCountIssues() {
   const dayNames = ['일','월','화','수','목','금','토'];
   const issues = [];
 
+  // 역할별 자리 수와 후보 인원 (해설 전용/독서 전용이 많으면 한쪽 자리가 소수에게 몰린다)
+  const roleOf = n => memberRoles[n] || 'both';
+  const haesulPool = members.filter(n => ['haesul','both'].includes(roleOf(n)));
+  const dokPool    = members.filter(n => ['dok','both'].includes(roleOf(n)));
+  const haesulSeats = monthSlots.length;
+  const dokSeats = monthSlots.reduce((a, x) => a + 1 + (x.slot.dok2 !== null && x.slot.dok2 !== undefined ? 1 : 0) + (x.slot.extraDoks || []).length, 0);
+  const seatPerHaesul = haesulPool.length ? haesulSeats / haesulPool.length : Infinity;
+  const seatPerDok    = dokPool.length ? dokSeats / dokPool.length : Infinity;
+  const roleSupplyReason = (m, hi, lo) => {
+    const out = [];
+    const r = roleOf(m);
+    const inH = r !== 'dok', inD = r !== 'haesul';
+    if (inH && hi != null && seatPerHaesul > hi && r === 'haesul')
+      out.push(`해설 가능 인원이 ${haesulPool.length}명뿐인데 해설 자리는 ${haesulSeats}개라 1인당 평균 ${seatPerHaesul.toFixed(1)}회 (역할 설정 때문)`);
+    else if (inH && r === 'both' && seatPerHaesul > (hi ?? Infinity))
+      out.push(`해설 가능 인원이 ${haesulPool.length}명뿐이라 해설 자리(${haesulSeats}개)를 나눠 맡음 (독서 전용 인원이 많은 역할 설정 때문)`);
+    if (inD && r === 'dok' && lo != null && seatPerDok < lo)
+      out.push(`독서 가능 인원이 ${dokPool.length}명이라 독서 자리(${dokSeats}개)가 1인당 평균 ${seatPerDok.toFixed(1)}회뿐 (역할 설정 때문)`);
+    return out;
+  };
+
   members.forEach(m => {
     const c = counts[m] || 0, lo = floorOf(m), hi = capOf(m);
     const under = lo != null && c < lo;
@@ -1630,6 +1651,7 @@ function getCountIssues() {
       if (tnDows.length) reasons.push(`${tnDows.join('·')}요일은 지정한 시간대만 가능`);
       if (dtoCnt) reasons.push(`특정 날짜·시간 불가 ${dtoCnt}건`);
       if (role !== 'both') reasons.push(`역할이 '${role === 'haesul' ? '해설' : '독서'}'로 한정됨`);
+      reasons.push(...roleSupplyReason(m, hi, lo));
       const partners = avoidPairs.filter(([a, b]) => a === m || b === m).map(([a, b]) => a === m ? b : a);
       if (partners.length) reasons.push(`함께 배정 제외: ${partners.join(', ')}`);
       if (totalPositions < members.length * lo) reasons.push(`전체 배정 자리(${totalPositions}개)가 인원×최소(${members.length}×${lo})보다 부족`);
@@ -1637,14 +1659,20 @@ function getCountIssues() {
     }
 
     if (over) {
+      reasons.push(...roleSupplyReason(m, hi, lo));
       let forced = 0;
       monthSlots.forEach(x => {
-        const names = slotNames(x.slot);
+        const s = x.slot, names = slotNames(s);
         if (!names.includes(m)) return;
-        const alt = members.some(o => o !== m && !names.includes(o) && canAssign(o, x.day, x.slot.time) && (capOf(o) == null || (counts[o] || 0) < capOf(o)));
+        // 이 사람이 맡은 역할(해설/독서)을 대신할 수 있는 사람이 있는지 — 역할 설정까지 반영
+        const needHaesul = s.haesul === m;
+        const alt = members.some(o => o !== m && !names.includes(o)
+          && (needHaesul ? roleOf(o) !== 'dok' : roleOf(o) !== 'haesul')
+          && canAssign(o, x.day, x.slot.time)
+          && (capOf(o) == null || (counts[o] || 0) < capOf(o)));
         if (!alt) forced++;
       });
-      if (forced) reasons.push(`${forced}개 미사는 대신할 수 있는 봉사자가 없어 배정됨 (다른 사람의 불가일·가능일·상한 때문)`);
+      if (forced) reasons.push(`${forced}개 미사는 같은 역할을 대신할 수 있는 봉사자가 없어 배정됨 (다른 사람의 역할·불가일·가능일·상한 때문)`);
       if (lo != null && lo > hi) reasons.push(`최소 ${lo}회가 최대 ${hi}회보다 높게 설정됨`);
       if (totalPositions > members.length * hi) reasons.push(`전체 배정 자리(${totalPositions}개)가 인원×최대(${members.length}×${hi})보다 많음`);
       if (!reasons.length) reasons.push('배정 후 수동으로 바뀌었을 수 있음');
