@@ -1969,6 +1969,14 @@ function getAvailSummary(name) {
   return { label: label || '미지정', cls };
 }
 
+// 명단 표시 순서: 해설·독서(양쪽) → 해설 → 독서 (같은 역할 안에서는 등록 순서 유지)
+function memberOrder() {
+  const rank = { both: 0, haesul: 1, dok: 2 };   // 첫 화면 렌더링 시점에도 안전하도록 함수 안에 둔다
+  return members.map((m, i) => [m, i])
+    .sort((a, b) => (rank[memberRoles[a[0]] || 'both'] - rank[memberRoles[b[0]] || 'both']) || (a[1] - b[1]));
+}
+function sortedMembers() { return memberOrder().map(([m]) => m); }
+
 // 현재 연/월(scheduleData) 기준 봉사자별 배정 횟수 집계
 function getAssignCounts() {
   const counts = {};
@@ -2168,7 +2176,7 @@ function renderMemberList() {
     totalEl.textContent = `총 ${members.length}명 · 해설 ${h} · 독서 ${d}`;
     totalEl.title = `해설 가능 ${h}명, 독서 가능 ${d}명 (양쪽 가능자는 두 쪽에 모두 포함)`;
   }
-  members.forEach((m, i) => {
+  memberOrder().forEach(([m, i]) => {
     const s = getAvailSummary(m);
     const r = getRoleInfo(m);
     const isEditing = (m === editingMemberName);
@@ -3583,7 +3591,7 @@ async function exportExcel() {
   });
 
   // ── 봉사자 명단 (해설/독서/합계 집계) ──
-  members.forEach((name, i) => {
+  sortedMembers().forEach((name, i) => {
     const ri = BASE_ROW + i;
     const row = ws.getRow(ri);
 
@@ -3738,7 +3746,7 @@ async function downloadExcelTemplate() {
   noteRow(ws1, '※ 현재 프로그램에 등록된 명단입니다. 이름은 불가일정 시트와 동일하게 입력하세요.', 5);
   headRow(ws1, ['번호','이름','역할','연락처','비고'], [8,14,18,18,24], GOLD);
   const roleLabel = { haesul:'해설자', dok:'독서자', both:'해설자·독서자' };
-  members.forEach((name, i) => {
+  sortedMembers().forEach((name, i) => {
     const r = i + 4;
     dataCell(ws1, r, 1, i+1, true);
     dataCell(ws1, r, 2, name, false);
