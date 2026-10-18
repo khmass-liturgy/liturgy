@@ -661,13 +661,8 @@
     </div>
 
     <div>
-      <div class="section-title">💾 데이터 저장/불러오기</div>
-      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">입력 내용은 자동 저장됩니다.<br>파일로 내보내거나 불러올 수 있습니다.</p>
-      <button class="btn btn-primary" onclick="exportData()" style="margin-bottom:4px">📤 파일로 내보내기</button>
-      <label class="btn btn-outline" style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:4px">
-        📥 파일에서 불러오기
-        <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none">
-      </label>
+      <div class="section-title">📗 불가일정 엑셀</div>
+      <p style="font-size:11px;color:var(--gray);margin-bottom:7px">입력 내용은 클라우드에 자동 저장됩니다.</p>
       <button class="btn btn-outline" onclick="downloadExcelTemplate()" style="margin-top:4px">📄 불가일정 양식 다운로드</button>
       <label class="btn btn-gold" style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:4px">
         📗 불가일정 엑셀 업로드
@@ -1356,64 +1351,6 @@ function showSaveToast() {
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 1800);
-}
-function exportData() {
-  const data = { year, month, members, memberRoles, availability, timeOff, timeOn, dateTimeOff, avoidPairs, memberMinCount, memberMaxCount, defaultMinCount, defaultMaxCount, archive, scheduleData };
-  const json =JSON.stringify(data, null, 2);
-  const d = new Date();
-  const filename = `liturgy_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
-  // UTF-8 바이트 → base64 (한글 포함 안전 처리)
-  const bytes = new TextEncoder().encode(json);
-  let binary = '';
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  const b64 = btoa(binary);
-  const a = document.createElement('a');
-  a.href = 'data:application/json;base64,' + b64;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (data.members)      members      = data.members;
-      if (data.memberRoles)  memberRoles  = data.memberRoles;
-      if (data.availability) availability = data.availability;
-      if (data.timeOff)      timeOff      = data.timeOff;
-      if (data.timeOn)       timeOn       = data.timeOn;
-      if (data.dateTimeOff)  dateTimeOff  = data.dateTimeOff;
-      if (data.avoidPairs)   avoidPairs   = data.avoidPairs;
-      if (data.memberMinCount) memberMinCount = data.memberMinCount;
-      if (data.memberMaxCount) memberMaxCount = data.memberMaxCount;
-      if (data.archive) archive = data.archive;
-      if ('defaultMinCount' in data) defaultMinCount = data.defaultMinCount;
-      if ('defaultMaxCount' in data) defaultMaxCount = data.defaultMaxCount;
-      if (data.scheduleData) scheduleData = data.scheduleData;
-      // 연월 복원: 명시된 값 우선, 없으면 scheduleData 키에서 자동 감지 (구버전 호환)
-      if (data.year && data.month) {
-        year = data.year; month = data.month;
-      } else if (data.scheduleData) {
-        const keys = Object.keys(data.scheduleData).sort();
-        if (keys.length > 0) {
-          const parts = keys[keys.length - 1].split('-').map(Number);
-          year = parts[0]; month = parts[1];
-        }
-      }
-      document.getElementById('yearInput').value  = year;
-      document.getElementById('monthInput').value = month;
-      renderMemberList();
-      renderCalendar();
-      saveData();
-      alert('✅ 데이터를 불러왔습니다.');
-    } catch(err) { alert('❌ 파일을 읽을 수 없습니다.'); }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
 }
 // ── 불가일정 엑셀 업로드 (전례단_불가일정_양식.xlsx) ──
 function importExcelAvailability(event) {
