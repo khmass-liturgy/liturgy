@@ -1,6 +1,11 @@
 {
   "notices": [
     {
+      "title": "전자기부금 영수증 발급 안내",
+      "date": "2026-10-24",
+      "url": "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=40645"
+    },
+    {
       "title": "의정부 교구 대회 pre - WYD 행사 및 참가 신청",
       "date": "2026-07-25",
       "url": "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=38783"
@@ -19,11 +24,6 @@
       "title": "‘1본당 1난민가정 동행 사업’ 동행 활동가 양성 교육",
       "date": "2026-05-10",
       "url": "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37071"
-    },
-    {
-      "title": "청소년 주일 행사, 연극 관람 갑니다~",
-      "date": "2026-05-10",
-      "url": "https://sd.uca.or.kr/kyoha/board_view.aspx?mnucd=20001877&board_seq=37070"
     }
   ],
   "bulletins": [
@@ -53,6 +53,6 @@
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-0927-877.pdf"
     }
   ],
-  "updatedAt": "2026-10-24T08:32:11.429Z",
+  "updatedAt": "2026-10-24T13:45:26.164Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
