@@ -28,6 +28,11 @@
   ],
   "bulletins": [
     {
+      "title": "연중 제33주일 / 세계 가난한 이의 날",
+      "date": "2026-11-15",
+      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1115-884.pdf"
+    },
+    {
       "title": "연중 제32주일 / 평신도 주일",
       "date": "2026-11-08",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1108-883.pdf"
@@ -46,13 +51,8 @@
       "title": "연중 제29주일 / 전교 주일 / 민족들의 복음화를 위한 미사",
       "date": "2026-10-18",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1018-880.pdf"
-    },
-    {
-      "title": "연중 제28주일 / 군인 주일",
-      "date": "2026-10-11",
-      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1011-879.pdf"
     }
   ],
-  "updatedAt": "2026-11-13T11:46:02.792Z",
+  "updatedAt": "2026-11-14T01:55:24.888Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
