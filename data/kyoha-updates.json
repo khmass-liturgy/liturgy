@@ -28,6 +28,11 @@
   ],
   "bulletins": [
     {
+      "title": "대림 제1주일",
+      "date": "2026-11-29",
+      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1129-886.pdf"
+    },
+    {
       "title": "온 우리의 임금이신 우리 주 예수 그리스도왕 대축일",
       "date": "2026-11-22",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1122-885.pdf"
@@ -46,13 +51,8 @@
       "title": "모든 성인 대축일",
       "date": "2026-11-01",
       "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1101-882.pdf"
-    },
-    {
-      "title": "연중 제30주일",
-      "date": "2026-10-25",
-      "url": "https://sd.uca.or.kr/pdfjs/web/viewer.php?file=/kyoha/upload/jubo/2026-1025-881.pdf"
     }
   ],
-  "updatedAt": "2026-11-28T03:39:51.615Z",
+  "updatedAt": "2026-11-28T12:36:45.992Z",
   "source": "https://sd.uca.or.kr/kyoha/"
 }
